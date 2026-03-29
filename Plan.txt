@@ -1,0 +1,318 @@
+1. Core product idea
+
+The app should answer:
+
+“Given who I am, what I’m trying to achieve, and what this restaurant actually offers, what should I eat here?”
+
+It should support:
+
+dietary restrictions: halal, vegetarian, vegan, lactose-free, nut allergy, gluten-free
+health goals: fat loss, muscle gain, better energy, high protein, lower sugar, heart-friendly eating
+preference goals: spicy, less oily, filling meals, cheap meals
+lifestyle goals: better long-term eating habits, balanced meals, more fiber, less sodium
+2. Best way to scope it
+
+Do Phase 1 first, because “biological needs” can become too vague or medically risky.
+
+MVP
+
+User creates a profile:
+
+age
+sex
+height
+weight
+activity level
+goal
+dietary restrictions
+allergies
+disliked foods
+budget
+preferred cuisine
+
+Then the user uploads:
+
+a menu photo / PDF / screenshot
+or
+a restaurant website URL
+
+The app:
+
+extracts menu items
+estimates nutrition
+filters unsafe/incompatible items
+ranks meals
+explains why each meal fits the user
+
+Output:
+
+Top 3 best dishes
+2 decent alternatives
+1–2 dishes to avoid
+explanation like:
+“High protein, moderate calories, lower sugar”
+“Avoid because it likely contains dairy and exceeds your sodium preference”
+3. Realistic system design
+Frontend
+
+Use:
+
+Next.js
+Tailwind CSS
+shadcn/ui
+pages for onboarding, upload, results, saved meals
+Backend
+
+Use:
+
+FastAPI or Node.js with Express
+Python is especially nice if you want nutrition logic + OCR + scraping pipeline
+Database
+
+Use:
+
+PostgreSQL
+for:
+users
+profiles
+restaurants
+menus
+menu_items
+recommendations
+uploaded files
+AI / processing services
+
+Split into 4 services:
+
+A. Profile Engine
+
+Calculates user targets from:
+
+BMR/TDEE estimate
+protein target
+calorie preference band
+sodium/sugar/fiber preference rules
+restriction rules
+
+Important: this should be wellness guidance, not medical diagnosis.
+
+B. Menu Ingestion Engine
+
+Handles:
+
+image uploads of menu
+PDFs/screenshots
+restaurant website URL scraping
+
+Pipeline:
+
+OCR for menu images
+structured extraction of dish names, prices, descriptions
+if website URL is given, crawl likely menu pages
+normalize into structured JSON
+C. Nutrition Estimation Engine
+
+For each menu item:
+
+infer ingredients from title + description
+estimate macros:
+calories
+protein
+carbs
+fat
+fiber
+sugar
+sodium
+detect allergens / dietary compatibility
+confidence score
+D. Recommendation Engine
+
+Ranks items using:
+
+rule-based scoring first
+optional LLM explanation layer after
+
+Scoring factors:
+
+matches restrictions
+supports goal
+nutrient density
+protein adequacy
+sugar/sodium control
+calorie fit
+satiety/fiber
+preference match
+confidence of nutrition estimate
+4. Suggested user flow
+User flow
+Sign up / login
+Complete health & food profile
+Upload menu image or paste restaurant URL
+App extracts menu
+App analyzes dishes
+App shows:
+best overall
+best high-protein
+best low-calorie
+best balanced option
+dishes to avoid
+User can save recommendation history
+5. Features to build
+Phase 1
+profile onboarding
+upload menu image
+URL input for restaurant website
+OCR + website scraping
+menu item extraction
+recommendation ranking
+explainability cards
+saved history
+Phase 2
+compare two restaurants
+meal swap suggestions
+“lighter version” suggestion
+daily meal tracking
+healthier combination suggestions
+restaurant-specific favorites
+Phase 3
+scan live restaurant menu from camera
+geo-based nearby restaurant menu suggestions
+integration with wearables
+nutrient deficiency trend estimation from food logs
+family/shared profiles
+6. Important product boundaries
+
+You said:
+
+“check what your biological needs are and what nutrients your body is looking for for longevity”
+
+That sounds powerful, but the app should not claim:
+
+diagnosis
+deficiency detection
+disease treatment
+exact biological nutrient demand
+
+A safer and better framing is:
+
+“Uses profile-based nutrition logic and meal analysis to recommend food aligned with your goals, restrictions, and general healthy eating patterns.”
+
+So instead of:
+
+“Your body is deficient in magnesium”
+
+say:
+
+“Based on your goal and food preferences, meals with more fiber, lean protein, and micronutrient-rich ingredients may be more supportive.”
+7. Smart recommendation logic
+
+Use a hybrid system.
+
+Rule-based core
+
+This makes the app reliable.
+
+Example:
+
+if nut allergy detected and item may contain nuts → hard reject
+if vegan and dish contains chicken/beef/egg/dairy → reject
+if fat-loss goal → prefer lower calorie density + higher protein
+if muscle gain goal → prefer higher protein + sufficient calories
+if heart-friendly → penalize high sodium, fried items, sugary drinks
+AI explanation layer
+
+Use an LLM to:
+
+summarize why dish is recommended
+explain tradeoffs
+generate natural language descriptions
+extract menu structure from messy OCR/website text
+8. Data model
+UserProfile
+id
+name
+age
+sex
+height_cm
+weight_kg
+activity_level
+goal
+calorie_preference
+diet_type
+allergies[]
+dislikes[]
+budget
+preferred_cuisines[]
+Restaurant
+id
+name
+website_url
+cuisine_type
+Menu
+id
+restaurant_id
+source_type (image/url/pdf)
+source_url
+upload_path
+parsed_text
+parsed_status
+MenuItem
+id
+menu_id
+name
+description
+price
+ingredients[]
+tags[]
+estimated_calories
+estimated_protein
+estimated_carbs
+estimated_fat
+estimated_fiber
+estimated_sugar
+estimated_sodium
+allergens[]
+confidence_score
+Recommendation
+id
+user_id
+menu_id
+menu_item_id
+score
+reasons[]
+warnings[]
+rank
+9. Tech stack recommendation
+Best stack for you
+
+Since you want image upload + URL scraping + smart backend:
+
+Frontend: Next.js + Tailwind
+Backend API: FastAPI
+DB: PostgreSQL
+Auth: Clerk or NextAuth
+File storage: Cloudinary / S3
+OCR: Tesseract or cloud OCR
+Scraping: Playwright + BeautifulSoup
+AI extraction/explanations: OpenAI API
+Nutrition source: nutrition database or your own structured estimates
+Deployment: Vercel + Render/Railway
+10. What the result screen should show
+
+For each dish card:
+
+dish name
+estimated nutrition
+match score
+why it fits
+warnings
+confidence level
+
+Example:
+Grilled Chicken Bowl — 91/100
+
+high protein for muscle recovery
+moderate calories
+lower sugar than other options
+contains vegetables for fiber
+warning: sauce may increase sodium

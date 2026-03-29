@@ -1,0 +1,19 @@
+{
+  "restaurant_name": "Green Fork Kitchen",
+  "source_url": "https://example.com/menu",
+  "cuisine_tags": ["healthy", "casual"],
+  "items": [
+    {
+      "category": "Bowls",
+      "name": "Tofu Harvest Bowl",
+      "description": "Quinoa, roasted squash, kale, tahini",
+      "price": 17
+    },
+    {
+      "category": "Bowls",
+      "name": "Chicken Fuel Bowl",
+      "description": "Brown rice, broccoli, avocado, grilled chicken",
+      "price": 18
+    }
+  ]
+}
