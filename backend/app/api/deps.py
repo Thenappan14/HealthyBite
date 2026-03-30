@@ -11,7 +11,7 @@ def get_current_user(
     if x_user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Provide X-User-Id header for demo authentication.",
+            detail="Provide X-User-Id header for the current signed-in user.",
         )
 
     user = db.users.find_one({"id": x_user_id}, {"_id": 0})

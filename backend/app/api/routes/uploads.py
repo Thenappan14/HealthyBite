@@ -9,9 +9,7 @@ from app.core.config import settings
 from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import UploadResponse
-from app.services.menu_parser import normalize_menu_text
-from app.services.nutrition import enrich_menu_items
-from app.services.ocr import extract_text_from_upload
+from app.services.openai_analysis import analyze_uploaded_menu
 
 router = APIRouter()
 
@@ -31,10 +29,28 @@ async def upload_menu(
     contents = await file.read()
     file_path.write_bytes(contents)
 
-    extracted_text = extract_text_from_upload(file.filename or "menu", contents)
-    structured = normalize_menu_text(extracted_text)
-    enriched_items = enrich_menu_items(structured["items"])
-    structured["items"] = enriched_items
+    try:
+        structured = analyze_uploaded_menu(file.filename or "menu", contents)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="AI menu extraction failed for this upload. Try a clearer file or retry.",
+        ) from exc
+
+    analyzed_items = structured.get("items", [])
+    extracted_preview = structured.get("source_summary") or (
+        "\n".join(
+            filter(
+                None,
+                [
+                    f'{item.get("name", "")}: {item.get("description", "")}'.strip(": ")
+                    for item in analyzed_items[:5]
+                ],
+            )
+        )
+    )
 
     menu_id = next_sequence(db, "menus")
     menu = with_timestamps(
@@ -44,13 +60,13 @@ async def upload_menu(
             "source_type": "upload",
             "source_filename": file.filename,
             "source_url": None,
-            "extracted_text": extracted_text,
+            "extracted_text": extracted_preview,
             "structured_json": structured,
         }
     )
     db.menus.insert_one(menu)
 
-    for item in enriched_items:
+    for item in analyzed_items:
         db.menu_items.insert_one(
             with_timestamps(
                 {
@@ -80,12 +96,15 @@ async def upload_menu(
                 "file_type": suffix.replace(".", ""),
                 "source_url": None,
                 "processing_status": "completed",
-                "notes": "Parsed with rule-based OCR placeholder pipeline.",
+                "notes": (
+                    "Analyzed with OpenAI vision/document understanding and structured "
+                    "estimated nutrition extraction."
+                ),
             }
         )
     )
     return UploadResponse(
         upload_id=upload_id,
         menu_id=menu_id,
-        extracted_preview=extracted_text[:300],
+        extracted_preview=extracted_preview[:300],
     )

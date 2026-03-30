@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24
     mongodb_url: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "platewise"
+    openai_api_key: str | None = None
+    openai_menu_model: str = "gpt-4.1"
+    openai_recommendation_model: str = "gpt-4.1"
+    openai_enable_web_search: bool = True
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )

@@ -41,8 +41,8 @@ Recommendations are based on estimated nutrition and provided profile informatio
 
 - Frontend: Next.js, TypeScript, Tailwind CSS, shadcn-style UI primitives
 - Backend: FastAPI, Pydantic, MongoDB, PyMongo
-- Ingestion: OCR placeholder pipeline for uploads, heuristic website parser for restaurant URLs
-- Scoring: hard filters plus hybrid soft scoring for profile fit
+- Ingestion: OpenAI-powered upload extraction and website-to-menu structuring
+- Recommendations: OpenAI-generated ranking guided by user profile, menu content, and estimated nutrition
 
 ## Backend setup
 
@@ -59,6 +59,7 @@ uvicorn app.main:app --reload
 API runs at `http://localhost:8000`, Swagger at `http://localhost:8000/docs`.
 
 The backend expects MongoDB to be available at the `MONGODB_URL` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example). The default is `mongodb://localhost:27017` with database name `platewise`.
+Set `OPENAI_API_KEY` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example) before using upload analysis, URL ingestion, or recommendations.
 
 ## Frontend setup
 
@@ -97,10 +98,10 @@ Detailed request and response notes are in [docs/api.md](/c:/Users/Projects/Heal
 
 ## Notes on estimation and safety
 
-- Nutrition values are estimated from menu wording and likely ingredients.
-- Allergens are inferred heuristically and should be treated as warnings, not guarantees.
+- Nutrition values are estimated from menu wording, model inference, and optional web lookup support.
+- Allergens are inferred from menu information and should be treated as warnings, not guarantees.
 - The system avoids medical claims and uses cautious wording throughout the API and UI.
-- The OCR and crawler layers are intentionally scaffolded so you can swap in production OCR, vision, or LLM extraction later.
+- The system is a food guidance tool, not a clinician, and should not be used as medical advice.
 
 ## Sample parser assets
 
