@@ -11,8 +11,8 @@ import { login, persistAuthSession } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("demo@platewise.app");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -22,7 +22,7 @@ export default function LoginPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Welcome back</p>
         <CardTitle className="mt-3">Log in to PlateWise</CardTitle>
         <CardDescription className="mt-3">
-          Use the demo account from the README or wire this form to the FastAPI auth endpoints.
+          Sign in to continue with your saved profile, menu analysis, and recommendation history.
         </CardDescription>
         <div className="mt-8 space-y-4">
           <Input placeholder="Email address" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />

@@ -13,24 +13,51 @@ export default function ResultsPage() {
   const searchParams = useSearchParams();
   const [menu, setMenu] = useState<MenuResponse | null>(null);
   const [results, setResults] = useState<RecommendationResponse | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
   const requestedMenuId = Number(searchParams.get("menuId") ?? "0");
 
   useEffect(() => {
     void (async () => {
-      const menus = await fetchMenus();
-      const fallbackMenuId = menus[0]?.id ?? 1;
-      const activeMenuId = requestedMenuId || fallbackMenuId;
-      const [nextMenu, nextResults] = await Promise.all([
-        fetchMenu(activeMenuId),
-        fetchRecommendations(activeMenuId)
-      ]);
-      setMenu(nextMenu);
-      setResults(nextResults);
+      try {
+        const menus = await fetchMenus();
+        const fallbackMenuId = menus[0]?.id;
+        const activeMenuId = requestedMenuId || fallbackMenuId;
+
+        if (!activeMenuId) {
+          setLoaded(true);
+          return;
+        }
+
+        const [nextMenu, nextResults] = await Promise.all([
+          fetchMenu(activeMenuId),
+          fetchRecommendations(activeMenuId)
+        ]);
+        setMenu(nextMenu);
+        setResults(nextResults);
+      } catch {
+        setError("Unable to load recommendations right now.");
+      } finally {
+        setLoaded(true);
+      }
     })();
   }, [requestedMenuId]);
 
-  if (!menu || !results) {
+  if (!loaded) {
     return <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">Loading results...</main>;
+  }
+
+  if (!menu || !results) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">
+        <Card>
+          <CardTitle className="text-3xl">No results yet</CardTitle>
+          <CardDescription className="mt-3 text-lg">
+            {error || "Upload a menu or analyze a restaurant URL to generate recommendations."}
+          </CardDescription>
+        </Card>
+      </main>
+    );
   }
 
   const activeMenuId = requestedMenuId || menu.id;

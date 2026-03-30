@@ -13,16 +13,34 @@ import { HistoryItem, Profile } from "@/lib/types";
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     void Promise.all([fetchProfile(), fetchHistory()]).then(([nextProfile, nextHistory]) => {
       setProfile(nextProfile);
       setHistory(nextHistory);
+      setLoaded(true);
     });
   }, []);
 
-  if (!profile) {
+  if (!loaded) {
     return <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">Loading dashboard...</main>;
+  }
+
+  if (!profile) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">
+        <Card>
+          <CardTitle className="text-3xl">No profile yet</CardTitle>
+          <CardDescription className="mt-3 text-lg">
+            Sign in and complete your profile before analyzing menus and viewing recommendations.
+          </CardDescription>
+          <Button asChild className="mt-6">
+            <Link href="/profile">Go to profile setup</Link>
+          </Button>
+        </Card>
+      </main>
+    );
   }
 
   return (

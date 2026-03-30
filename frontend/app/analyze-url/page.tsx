@@ -30,9 +30,13 @@ export default function AnalyzeUrlPage() {
             className="md:min-w-40"
             onClick={() =>
               startTransition(async () => {
-                const menu = await ingestRestaurantUrl(url);
-                setMessage(`Parsed ${menu.items.length} menu items from ${menu.source_url ?? url}.`);
-                router.push(`/results?menuId=${menu.id}`);
+                try {
+                  const menu = await ingestRestaurantUrl(url);
+                  setMessage(`Parsed ${menu.items.length} menu items from ${menu.source_url ?? url}.`);
+                  router.push(`/results?menuId=${menu.id}`);
+                } catch {
+                  setMessage("Analysis failed. Please sign in and check that the backend is running.");
+                }
               })
             }
           >

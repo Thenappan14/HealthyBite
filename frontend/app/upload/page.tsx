@@ -28,11 +28,15 @@ export default function UploadPage() {
             <UploadDropzone
               onFileSelected={(file) =>
                 startTransition(async () => {
-                  const result = await uploadMenu(file);
-                  setMessage(
-                    `Upload complete. Menu ${result.menu_id} is ready for recommendation generation.`
-                  );
-                  router.push(`/results?menuId=${result.menu_id}`);
+                  try {
+                    const result = await uploadMenu(file);
+                    setMessage(
+                      `Upload complete. Menu ${result.menu_id} is ready for recommendation generation.`
+                    );
+                    router.push(`/results?menuId=${result.menu_id}`);
+                  } catch {
+                    setMessage("Upload failed. Please sign in and make sure the backend is running.");
+                  }
                 })
               }
             />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,7 @@ function ChoicePills({
 
 export default function ProfilePage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState("");
   const [customCuisineInput, setCustomCuisineInput] = useState("");
@@ -137,6 +138,10 @@ export default function ProfilePage() {
   const [form, setForm] = useState(emptyProfile);
   const [allergiesText, setAllergiesText] = useState("");
   const [dislikedFoodsText, setDislikedFoodsText] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function toggleCuisine(value: string) {
     setForm((current) => ({
@@ -154,6 +159,10 @@ export default function ProfilePage() {
         ? current.preferred_dining_styles.filter((entry) => entry !== value)
         : [...current.preferred_dining_styles, value]
     }));
+  }
+
+  if (!mounted) {
+    return <main className="mx-auto max-w-6xl px-4 py-10 md:px-6">Loading profile...</main>;
   }
 
   return (
