@@ -57,6 +57,22 @@ export async function ingestRestaurantUrl(url: string): Promise<MenuResponse> {
   }
 }
 
+export async function fetchMenus(): Promise<MenuResponse[]> {
+  try {
+    return await request<MenuResponse[]>("/menus");
+  } catch {
+    return [sampleMenu];
+  }
+}
+
+export async function fetchMenu(menuId: number): Promise<MenuResponse> {
+  try {
+    return await request<MenuResponse>(`/menus/${menuId}`);
+  } catch {
+    return sampleMenu;
+  }
+}
+
 export async function uploadMenu(file: File): Promise<{ upload_id: number; menu_id: number; extracted_preview: string }> {
   const formData = new FormData();
   formData.append("file", file);
@@ -103,5 +119,20 @@ export async function fetchHistory(): Promise<HistoryItem[]> {
     return await request<HistoryItem[]>("/history");
   } catch {
     return sampleHistory;
+  }
+}
+
+export async function setRecommendationSaved(
+  recommendationId: number,
+  saved: boolean
+): Promise<HistoryItem> {
+  try {
+    return await request<HistoryItem>(`/history/${recommendationId}/save`, {
+      method: "PUT",
+      body: JSON.stringify({ saved })
+    });
+  } catch {
+    const fallback = sampleHistory.find((item) => item.id === recommendationId) ?? sampleHistory[0];
+    return { ...fallback, saved };
   }
 }

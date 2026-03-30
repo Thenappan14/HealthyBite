@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { DisclaimerBanner } from "@/components/app/disclaimer-banner";
@@ -10,6 +11,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { uploadMenu } from "@/lib/api";
 
 export default function UploadPage() {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -30,6 +32,7 @@ export default function UploadPage() {
                   setMessage(
                     `Upload complete. Menu ${result.menu_id} is ready for recommendation generation.`
                   );
+                  router.push(`/results?menuId=${result.menu_id}`);
                 })
               }
             />
@@ -37,7 +40,7 @@ export default function UploadPage() {
           {message ? <p className="mt-5 text-sm text-muted-foreground">{message}</p> : null}
           <div className="mt-6 flex gap-3">
             <Button asChild>
-              <Link href="/results">View sample results</Link>
+              <Link href="/results">View results</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/analyze-url">Analyze by URL instead</Link>
