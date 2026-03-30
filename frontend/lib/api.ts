@@ -1,8 +1,25 @@
 import { defaultProfile, sampleHistory, sampleMenu, sampleRecommendations } from "@/lib/mock-data";
-import { HistoryItem, MenuResponse, Profile, RecommendationResponse } from "@/lib/types";
+import { AuthResponse, HistoryItem, MenuResponse, Profile, RecommendationResponse } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 const DEMO_USER_ID = process.env.NEXT_PUBLIC_DEMO_USER_ID ?? "1";
+
+function getStoredUserId(): string {
+  if (typeof window === "undefined") {
+    return DEMO_USER_ID;
+  }
+
+  return window.localStorage.getItem("platewise_user_id") ?? DEMO_USER_ID;
+}
+
+export function persistAuthSession(auth: AuthResponse) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem("platewise_token", auth.access_token);
+  window.localStorage.setItem("platewise_user_id", String(auth.user_id));
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
@@ -10,7 +27,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": DEMO_USER_ID,
+        "X-User-Id": getStoredUserId(),
         ...(init?.headers ?? {})
       },
       cache: "no-store"
@@ -24,6 +41,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new Error("API unavailable");
   }
+}
+
+export async function signUp(email: string, password: string): Promise<AuthResponse> {
+  return await request<AuthResponse>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password })
+  });
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  return await request<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password })
+  });
 }
 
 export async function fetchProfile(): Promise<Profile> {
@@ -81,7 +112,7 @@ export async function uploadMenu(file: File): Promise<{ upload_id: number; menu_
     const response = await fetch(`${API_BASE_URL}/uploads`, {
       method: "POST",
       headers: {
-        "X-User-Id": DEMO_USER_ID
+        "X-User-Id": getStoredUserId()
       },
       body: formData
     });

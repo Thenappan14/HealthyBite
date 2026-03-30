@@ -1,13 +1,29 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, Link2, ScanSearch, UserRoundCog } from "lucide-react";
 
 import { DisclaimerBanner } from "@/components/app/disclaimer-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { fetchHistory, fetchProfile } from "@/lib/api";
+import { HistoryItem, Profile } from "@/lib/types";
 
-export default async function DashboardPage() {
-  const [profile, history] = await Promise.all([fetchProfile(), fetchHistory()]);
+export default function DashboardPage() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  useEffect(() => {
+    void Promise.all([fetchProfile(), fetchHistory()]).then(([nextProfile, nextHistory]) => {
+      setProfile(nextProfile);
+      setHistory(nextHistory);
+    });
+  }, []);
+
+  if (!profile) {
+    return <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">Loading dashboard...</main>;
+  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">

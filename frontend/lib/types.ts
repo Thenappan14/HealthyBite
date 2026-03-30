@@ -70,3 +70,8 @@ export type HistoryItem = {
   created_at: string;
 };
 
+export type AuthResponse = {
+  access_token: string;
+  user_id: number;
+  token_type: string;
+};

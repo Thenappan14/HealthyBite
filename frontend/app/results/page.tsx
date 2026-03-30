@@ -1,22 +1,39 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
 import { DishCard } from "@/components/app/dish-card";
 import { DisclaimerBanner } from "@/components/app/disclaimer-banner";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { fetchMenu, fetchMenus, fetchRecommendations } from "@/lib/api";
+import { MenuResponse, RecommendationResponse } from "@/lib/types";
 
-export default async function ResultsPage({
-  searchParams
-}: {
-  searchParams?: Promise<{ menuId?: string }>;
-}) {
-  const params = searchParams ? await searchParams : undefined;
-  const requestedMenuId = Number(params?.menuId ?? "0");
-  const menus = await fetchMenus();
-  const fallbackMenuId = menus[0]?.id ?? 1;
-  const activeMenuId = requestedMenuId || fallbackMenuId;
-  const [menu, results] = await Promise.all([
-    fetchMenu(activeMenuId),
-    fetchRecommendations(activeMenuId)
-  ]);
+export default function ResultsPage() {
+  const searchParams = useSearchParams();
+  const [menu, setMenu] = useState<MenuResponse | null>(null);
+  const [results, setResults] = useState<RecommendationResponse | null>(null);
+  const requestedMenuId = Number(searchParams.get("menuId") ?? "0");
+
+  useEffect(() => {
+    void (async () => {
+      const menus = await fetchMenus();
+      const fallbackMenuId = menus[0]?.id ?? 1;
+      const activeMenuId = requestedMenuId || fallbackMenuId;
+      const [nextMenu, nextResults] = await Promise.all([
+        fetchMenu(activeMenuId),
+        fetchRecommendations(activeMenuId)
+      ]);
+      setMenu(nextMenu);
+      setResults(nextResults);
+    })();
+  }, [requestedMenuId]);
+
+  if (!menu || !results) {
+    return <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">Loading results...</main>;
+  }
+
+  const activeMenuId = requestedMenuId || menu.id;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">
