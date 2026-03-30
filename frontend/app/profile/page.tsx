@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -128,6 +129,7 @@ function ChoicePills({
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState("");
   const [customCuisineInput, setCustomCuisineInput] = useState("");
@@ -406,6 +408,7 @@ export default function ProfilePage() {
                 setAllergiesText(saved.allergies.join(", "));
                 setDislikedFoodsText(saved.disliked_foods.join(", "));
                 setStatus("Profile saved.");
+                router.push("/login");
               })
             }
           >
