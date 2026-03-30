@@ -13,6 +13,7 @@ export type Profile = {
   disliked_foods: string[];
   spice_preference: string;
   budget_preference: string;
+  preferred_dining_styles: string[];
   preferred_cuisines: string[];
 };
 
@@ -70,3 +71,8 @@ export type HistoryItem = {
   created_at: string;
 };
 
+export type AuthResponse = {
+  access_token: string;
+  user_id: number;
+  token_type: string;
+};

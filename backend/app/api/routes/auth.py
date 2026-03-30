@@ -27,7 +27,7 @@ def signup(payload: SignUpRequest, db: Database = Depends(get_db)) -> TokenRespo
             }
         )
     )
-    return TokenResponse(access_token=create_access_token(str(user_id)))
+    return TokenResponse(access_token=create_access_token(str(user_id)), user_id=user_id)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -37,4 +37,4 @@ def login(payload: LoginRequest, db: Database = Depends(get_db)) -> TokenRespons
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
-    return TokenResponse(access_token=create_access_token(str(user["id"])))
+    return TokenResponse(access_token=create_access_token(str(user["id"])), user_id=user["id"])

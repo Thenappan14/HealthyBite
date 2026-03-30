@@ -1,10 +1,22 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
 import { BookmarkCheck } from "lucide-react";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { fetchHistory } from "@/lib/api";
+import { fetchHistory, setRecommendationSaved } from "@/lib/api";
+import { HistoryItem } from "@/lib/types";
 
-export default async function SavedPage() {
-  const history = await fetchHistory();
+export default function SavedPage() {
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    void fetchHistory().then(setHistory);
+  }, []);
+
+  const savedItems = history.filter((item) => item.saved);
+  const visibleItems = savedItems.length ? savedItems : history;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 md:px-6">
@@ -18,13 +30,28 @@ export default async function SavedPage() {
         </div>
 
         <div className="mt-8 space-y-4">
-          {history.map((item) => (
+          {visibleItems.map((item) => (
             <div key={item.id} className="rounded-[24px] border border-border bg-white/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold text-foreground">{item.dish_name}</h3>
-                <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-                  {item.type} • {Math.round(item.score)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+                    {item.type} - {Math.round(item.score)}
+                  </span>
+                  <button
+                    className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground"
+                    onClick={() =>
+                      startTransition(async () => {
+                        const updated = await setRecommendationSaved(item.id, !item.saved);
+                        setHistory((current) =>
+                          current.map((entry) => (entry.id === item.id ? updated : entry))
+                        );
+                      })
+                    }
+                  >
+                    {item.saved ? "Unsave" : "Save"}
+                  </button>
+                </div>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">{item.summary_reason}</p>
               {item.warnings.length ? (
@@ -32,7 +59,13 @@ export default async function SavedPage() {
               ) : null}
             </div>
           ))}
+          {!visibleItems.length ? (
+            <p className="text-sm text-muted-foreground">
+              No recommendations yet. Generate results from an uploaded menu or restaurant URL first.
+            </p>
+          ) : null}
         </div>
+        {isPending ? <p className="mt-4 text-sm text-muted-foreground">Updating saved state...</p> : null}
       </Card>
     </main>
   );

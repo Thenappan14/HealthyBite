@@ -18,4 +18,6 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user["profile"] = db.user_profiles.find_one({"user_id": x_user_id}, {"_id": 0})
+    if user["profile"]:
+        user["profile"].setdefault("preferred_dining_styles", [])
     return user

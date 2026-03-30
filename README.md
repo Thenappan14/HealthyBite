@@ -53,21 +53,12 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env
 python -m app.init_db
-python -m app.seed
 uvicorn app.main:app --reload
 ```
 
 API runs at `http://localhost:8000`, Swagger at `http://localhost:8000/docs`.
 
 The backend expects MongoDB to be available at the `MONGODB_URL` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example). The default is `mongodb://localhost:27017` with database name `platewise`.
-
-### Demo authentication
-
-For a lightweight scaffold, authenticated endpoints accept an `X-User-Id` header. The seed script creates:
-
-- Email: `demo@platewise.app`
-- Password: `demo1234`
-- Demo user id: `1`
 
 ## Frontend setup
 
@@ -96,8 +87,11 @@ Frontend runs at `http://localhost:3000`.
 - `PUT /api/profile`
 - `POST /api/uploads`
 - `POST /api/ingest/url`
+- `GET /api/menus`
+- `GET /api/menus/{menu_id}`
 - `POST /api/recommendations/{menu_id}`
 - `GET /api/history`
+- `PUT /api/history/{recommendation_id}/save`
 
 Detailed request and response notes are in [docs/api.md](/c:/Users/Projects/HealthyBite/docs/api.md).
 
@@ -108,9 +102,9 @@ Detailed request and response notes are in [docs/api.md](/c:/Users/Projects/Heal
 - The system avoids medical claims and uses cautious wording throughout the API and UI.
 - The OCR and crawler layers are intentionally scaffolded so you can swap in production OCR, vision, or LLM extraction later.
 
-## Seed and sample data
+## Sample parser assets
 
-- Upload sample: [backend/sample_data/sample_menu_upload.txt](/c:/Users/Projects/HealthyBite/backend/sample_data/sample_menu_upload.txt)
+- Upload parser sample: [backend/sample_data/sample_menu_upload.txt](/c:/Users/Projects/HealthyBite/backend/sample_data/sample_menu_upload.txt)
 - Website parser sample payload: [backend/sample_data/sample_restaurant_payload.json](/c:/Users/Projects/HealthyBite/backend/sample_data/sample_restaurant_payload.json)
 
 ## Suggested next improvements

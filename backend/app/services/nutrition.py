@@ -20,6 +20,10 @@ STRICT_DIETS = {
     "vegetarian": {"blocked_terms": ["chicken", "steak", "fish", "salmon", "beef", "pork"]},
     "vegan": {"blocked_terms": ["chicken", "steak", "fish", "salmon", "beef", "pork", "cheese", "cream", "yogurt", "butter", "egg", "parmesan"]},
     "halal": {"blocked_terms": ["pork", "bacon", "ham", "wine", "beer"]},
+    "hindu_friendly": {"blocked_terms": ["beef"]},
+    "buddhist_friendly": {"blocked_terms": ["beef", "pork", "chicken", "fish", "salmon", "shrimp", "prawn", "oyster"]},
+    "no_beef": {"blocked_terms": ["beef"]},
+    "no_pork": {"blocked_terms": ["pork", "bacon", "ham"]},
     "pescatarian": {"blocked_terms": ["chicken", "steak", "beef", "pork"]},
     "lactose_free": {"blocked_terms": ["cream", "milk", "cheese", "yogurt", "butter", "parmesan"]},
     "gluten_free": {"blocked_terms": ["pasta", "bread", "soy sauce", "flour", "wheat", "noodle"]},
@@ -128,4 +132,3 @@ def _compatible_diets(text: str, default_diets: list[str]) -> list[str]:
 def _infer_ingredients(text: str) -> list[str]:
     candidates = ["rice", "greens", "tomato", "garlic", "avocado", "herbs"]
     return [item for item in candidates if item in text][:4] or ["mixed ingredients"]
-

@@ -1,10 +1,66 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
 import { DishCard } from "@/components/app/dish-card";
 import { DisclaimerBanner } from "@/components/app/disclaimer-banner";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { fetchRecommendations } from "@/lib/api";
+import { fetchMenu, fetchMenus, fetchRecommendations } from "@/lib/api";
+import { MenuResponse, RecommendationResponse } from "@/lib/types";
 
-export default async function ResultsPage() {
-  const results = await fetchRecommendations(1);
+export default function ResultsPage() {
+  const searchParams = useSearchParams();
+  const [menu, setMenu] = useState<MenuResponse | null>(null);
+  const [results, setResults] = useState<RecommendationResponse | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  const requestedMenuId = Number(searchParams.get("menuId") ?? "0");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const menus = await fetchMenus();
+        const fallbackMenuId = menus[0]?.id;
+        const activeMenuId = requestedMenuId || fallbackMenuId;
+
+        if (!activeMenuId) {
+          setLoaded(true);
+          return;
+        }
+
+        const [nextMenu, nextResults] = await Promise.all([
+          fetchMenu(activeMenuId),
+          fetchRecommendations(activeMenuId)
+        ]);
+        setMenu(nextMenu);
+        setResults(nextResults);
+      } catch {
+        setError("Unable to load recommendations right now.");
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, [requestedMenuId]);
+
+  if (!loaded) {
+    return <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">Loading results...</main>;
+  }
+
+  if (!menu || !results) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">
+        <Card>
+          <CardTitle className="text-3xl">No results yet</CardTitle>
+          <CardDescription className="mt-3 text-lg">
+            {error || "Upload a menu or analyze a restaurant URL to generate recommendations."}
+          </CardDescription>
+        </Card>
+      </main>
+    );
+  }
+
+  const activeMenuId = requestedMenuId || menu.id;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">
@@ -13,6 +69,9 @@ export default async function ResultsPage() {
         <h1 className="font-display text-5xl">Ranked dishes with estimated nutrition and reasoning</h1>
         <p className="max-w-3xl text-muted-foreground">
           Each result balances hard exclusions with softer profile fit signals like protein, calories, fiber, sodium, sugar, preferences, and budget.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Showing recommendations for menu #{activeMenuId} from {menu.source_filename ?? menu.source_url ?? "your latest analysis"}.
         </p>
       </div>
 
@@ -39,7 +98,7 @@ export default async function ResultsPage() {
             {results.alternatives.length ? (
               results.alternatives.map((dish) => <DishCard key={dish.menu_item_id} dish={dish} />)
             ) : (
-              <p className="text-sm text-muted-foreground">No fallback alternatives available in the sample dataset.</p>
+              <p className="text-sm text-muted-foreground">No additional alternatives were generated for this menu.</p>
             )}
           </div>
         </Card>
@@ -55,4 +114,3 @@ export default async function ResultsPage() {
     </main>
   );
 }
-

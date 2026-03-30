@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { DisclaimerBanner } from "@/components/app/disclaimer-banner";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ingestRestaurantUrl } from "@/lib/api";
 
 export default function AnalyzeUrlPage() {
+  const router = useRouter();
   const [url, setUrl] = useState("https://example.com/menu");
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -28,8 +30,13 @@ export default function AnalyzeUrlPage() {
             className="md:min-w-40"
             onClick={() =>
               startTransition(async () => {
-                const menu = await ingestRestaurantUrl(url);
-                setMessage(`Parsed ${menu.items.length} menu items from ${menu.source_url ?? url}.`);
+                try {
+                  const menu = await ingestRestaurantUrl(url);
+                  setMessage(`Parsed ${menu.items.length} menu items from ${menu.source_url ?? url}.`);
+                  router.push(`/results?menuId=${menu.id}`);
+                } catch {
+                  setMessage("Analysis failed. Please sign in and check that the backend is running.");
+                }
               })
             }
           >
@@ -49,4 +56,3 @@ export default function AnalyzeUrlPage() {
     </main>
   );
 }
-
