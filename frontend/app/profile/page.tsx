@@ -25,11 +25,14 @@ export default function ProfilePage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 md:px-6">
       <Card>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Profile setup</p>
-        <CardTitle className="mt-3">Tell PlateWise how to rank menus for you</CardTitle>
-        <CardDescription className="mt-3">
-          Your profile is used to filter incompatible dishes and tune the estimated scoring logic.
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-muted-foreground">Step 1: profile setup</p>
+        <CardTitle className="mt-3 text-4xl">Tell PlateWise what matters before menus come in</CardTitle>
+        <CardDescription className="mt-3 text-lg">
+          New users should complete this page first. Your goal, restrictions, allergies, dislikes, budget, and cuisine preferences shape everything that gets recommended later.
         </CardDescription>
+        <div className="mt-6 rounded-[28px] bg-secondary/55 p-5 text-lg text-foreground">
+          After saving this profile, use the upload or restaurant URL pages to analyze menus with your preferences already applied.
+        </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name" />
@@ -102,12 +105,11 @@ export default function ProfilePage() {
               })
             }
           >
-            {isPending ? "Saving..." : "Save profile"}
+            {isPending ? "Saving..." : "Save profile and continue"}
           </Button>
-          {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+          {status ? <p className="text-base text-muted-foreground">{status}</p> : null}
         </div>
       </Card>
     </main>
   );
 }
-
