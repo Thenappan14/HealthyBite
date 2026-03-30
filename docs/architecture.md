@@ -6,7 +6,7 @@ PlateWise is organized as a small monorepo with a Next.js frontend and a FastAPI
 
 - `frontend/` renders the product UI, profile forms, upload interactions, URL ingestion flow, results cards, and saved history.
 - `backend/` exposes REST APIs for auth, profiles, uploads, URL crawling, menu normalization, nutrition estimation, recommendation ranking, and history.
-- `docs/` captures architecture, API contracts, and a SQL-oriented schema reference.
+- `docs/` captures architecture, API contracts, and a MongoDB-oriented schema reference.
 
 ## Backend flow
 
@@ -26,6 +26,19 @@ PlateWise is organized as a small monorepo with a Next.js frontend and a FastAPI
    - soft scoring for goals, protein, calories, sugar, sodium, fiber, vegetables, cuisine fit, budget, and confidence
 6. Results are returned with explanations and saved to recommendation history.
 
+## MongoDB collections
+
+The backend stores numeric application ids inside MongoDB documents so the frontend and APIs can keep stable integer identifiers.
+
+- `users`
+- `user_profiles`
+- `restaurants`
+- `menus`
+- `menu_items`
+- `recommendations`
+- `upload_records`
+- `counters` for integer id sequences
+
 ## Frontend flow
 
 - Landing page introduces the product.
@@ -43,5 +56,4 @@ PlateWise is organized as a small monorepo with a Next.js frontend and a FastAPI
 - Replace heuristic crawling with a menu extractor that combines HTML parsing and model-assisted cleanup.
 - Add background workers for ingestion and recommendation jobs.
 - Replace header-based demo auth with JWT session management.
-- Add automated tests, migrations, and observability.
-
+- Add automated tests and observability.

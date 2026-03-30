@@ -1,12 +1,6 @@
-from app.models.entities import Menu, MenuItem, Recommendation, Restaurant, UploadRecord, User, UserProfile
+from app.models.entities import MenuItemModel, UserProfileModel
 
 __all__ = [
-    "User",
-    "UserProfile",
-    "Restaurant",
-    "Menu",
-    "MenuItem",
-    "Recommendation",
-    "UploadRecord",
+    "UserProfileModel",
+    "MenuItemModel",
 ]
-

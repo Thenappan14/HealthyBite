@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     env: str = "development"
     secret_key: str = "change-me"
     access_token_expire_minutes: int = 60 * 24
-    database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/platewise"
+    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_db_name: str = "platewise"
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
@@ -30,4 +31,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

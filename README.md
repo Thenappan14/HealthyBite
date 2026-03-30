@@ -26,7 +26,7 @@ Recommendations are based on estimated nutrition and provided profile informatio
 |-- docs/
 |   |-- api.md
 |   |-- architecture.md
-|   `-- database-schema.sql
+|   `-- database-schema.md
 |-- frontend/
 |   |-- app/
 |   |-- components/
@@ -40,7 +40,7 @@ Recommendations are based on estimated nutrition and provided profile informatio
 ## Stack
 
 - Frontend: Next.js, TypeScript, Tailwind CSS, shadcn-style UI primitives
-- Backend: FastAPI, SQLAlchemy, Pydantic, PostgreSQL
+- Backend: FastAPI, Pydantic, MongoDB, PyMongo
 - Ingestion: OCR placeholder pipeline for uploads, heuristic website parser for restaurant URLs
 - Scoring: hard filters plus hybrid soft scoring for profile fit
 
@@ -58,6 +58,8 @@ uvicorn app.main:app --reload
 ```
 
 API runs at `http://localhost:8000`, Swagger at `http://localhost:8000/docs`.
+
+The backend expects MongoDB to be available at the `MONGODB_URL` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example). The default is `mongodb://localhost:27017` with database name `platewise`.
 
 ### Demo authentication
 
@@ -114,7 +116,6 @@ Detailed request and response notes are in [docs/api.md](/c:/Users/Projects/Heal
 ## Suggested next improvements
 
 - Replace demo header auth with JWT bearer auth on protected routes.
-- Add Alembic migrations and background jobs for OCR/crawling.
+- Add background jobs for OCR/crawling.
 - Swap placeholder nutrition inference for a stronger ingredient knowledge base or model-assisted extraction.
 - Add file persistence, S3 support, and OCR providers for production use.
-

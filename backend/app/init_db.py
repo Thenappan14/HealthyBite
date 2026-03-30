@@ -1,11 +1,10 @@
-from app.db.base import Base
-from app.db.session import engine
+from app.db.mongo import init_collections
+from app.db.session import database
 
 
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    init_collections(database)
 
 
 if __name__ == "__main__":
     init_db()
-

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.models import MenuItem, UserProfile
+from app.models import MenuItemModel, UserProfileModel
 from app.services.nutrition import STRICT_DIETS
 
 DISCLAIMER = (
@@ -11,7 +11,17 @@ DISCLAIMER = (
 )
 
 
-def generate_recommendations(profile: UserProfile, items: list[MenuItem]) -> dict[str, Any]:
+def build_profile_model(profile: dict[str, Any]) -> UserProfileModel:
+    return UserProfileModel(**profile)
+
+
+def build_menu_item_models(items: list[dict[str, Any]]) -> list[MenuItemModel]:
+    return [MenuItemModel(**item) for item in items]
+
+
+def generate_recommendations(
+    profile: UserProfileModel, items: list[MenuItemModel]
+) -> dict[str, Any]:
     scored = []
     avoided = []
 
@@ -38,7 +48,7 @@ def generate_recommendations(profile: UserProfile, items: list[MenuItem]) -> dic
     }
 
 
-def score_item(profile: UserProfile, item: MenuItem) -> dict[str, Any]:
+def score_item(profile: UserProfileModel, item: MenuItemModel) -> dict[str, Any]:
     nutrition = item.nutrition_estimate or {}
     text = f"{item.name} {item.description or ''}".lower()
     reasons: list[str] = []
@@ -169,7 +179,9 @@ def _goal_alignment(goal: str, nutrition: dict[str, Any]) -> tuple[int, str]:
     return 8, "Estimated as generally appropriate for maintenance."
 
 
-def _serialize(item: MenuItem, evaluation: dict[str, Any], recommendation_type: str) -> dict[str, Any]:
+def _serialize(
+    item: MenuItemModel, evaluation: dict[str, Any], recommendation_type: str
+) -> dict[str, Any]:
     return {
         "menu_item_id": item.id,
         "dish_name": item.name,
@@ -183,4 +195,3 @@ def _serialize(item: MenuItem, evaluation: dict[str, Any], recommendation_type: 
         "why_not_recommended": evaluation["downsides"],
         "recommendation_type": recommendation_type,
     }
-

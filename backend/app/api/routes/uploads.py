@@ -2,12 +2,12 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
-from app.models import Menu, MenuItem, UploadRecord, User
 from app.schemas.menu import UploadResponse
 from app.services.menu_parser import normalize_menu_text
 from app.services.nutrition import enrich_menu_items
@@ -19,8 +19,8 @@ router = APIRouter()
 @router.post("", response_model=UploadResponse)
 async def upload_menu(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> UploadResponse:
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in {".jpg", ".jpeg", ".png", ".pdf", ".webp"}:
@@ -36,45 +36,56 @@ async def upload_menu(
     enriched_items = enrich_menu_items(structured["items"])
     structured["items"] = enriched_items
 
-    menu = Menu(
-        source_type="upload",
-        source_filename=file.filename,
-        extracted_text=extracted_text,
-        structured_json=structured,
+    menu_id = next_sequence(db, "menus")
+    menu = with_timestamps(
+        {
+            "id": menu_id,
+            "restaurant_id": None,
+            "source_type": "upload",
+            "source_filename": file.filename,
+            "source_url": None,
+            "extracted_text": extracted_text,
+            "structured_json": structured,
+        }
     )
-    db.add(menu)
-    db.flush()
+    db.menus.insert_one(menu)
 
     for item in enriched_items:
-        db.add(
-            MenuItem(
-                menu_id=menu.id,
-                category=item.get("category"),
-                name=item["name"],
-                description=item.get("description"),
-                price=item.get("price"),
-                inferred_ingredients=item.get("inferred_ingredients", []),
-                nutrition_estimate=item.get("nutrition_estimate", {}),
-                allergens=item.get("allergens", []),
-                diet_compatibility=item.get("diet_compatibility", []),
-                confidence_score=item.get("confidence_score", 0.5),
+        db.menu_items.insert_one(
+            with_timestamps(
+                {
+                    "id": next_sequence(db, "menu_items"),
+                    "menu_id": menu_id,
+                    "category": item.get("category"),
+                    "name": item["name"],
+                    "description": item.get("description"),
+                    "price": item.get("price"),
+                    "inferred_ingredients": item.get("inferred_ingredients", []),
+                    "nutrition_estimate": item.get("nutrition_estimate", {}),
+                    "allergens": item.get("allergens", []),
+                    "diet_compatibility": item.get("diet_compatibility", []),
+                    "confidence_score": item.get("confidence_score", 0.5),
+                }
             )
         )
 
-    upload = UploadRecord(
-        user_id=current_user.id,
-        menu_id=menu.id,
-        file_name=file.filename,
-        file_type=suffix.replace(".", ""),
-        processing_status="completed",
-        notes="Parsed with rule-based OCR placeholder pipeline.",
+    upload_id = next_sequence(db, "upload_records")
+    db.upload_records.insert_one(
+        with_timestamps(
+            {
+                "id": upload_id,
+                "user_id": current_user["id"],
+                "menu_id": menu_id,
+                "file_name": file.filename,
+                "file_type": suffix.replace(".", ""),
+                "source_url": None,
+                "processing_status": "completed",
+                "notes": "Parsed with rule-based OCR placeholder pipeline.",
+            }
+        )
     )
-    db.add(upload)
-    db.commit()
-    db.refresh(upload)
     return UploadResponse(
-        upload_id=upload.id,
-        menu_id=menu.id,
+        upload_id=upload_id,
+        menu_id=menu_id,
         extracted_preview=extracted_text[:300],
     )
-
