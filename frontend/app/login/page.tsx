@@ -47,7 +47,7 @@ export default function LoginPage() {
                   const auth = await login(email, password);
                   persistAuthSession(auth);
                   setMessage("Logged in successfully.");
-                  router.push("/dashboard");
+                  router.push("/upload");
                 } catch {
                   setMessage("Login failed. Check your credentials and backend.");
                 }
