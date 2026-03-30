@@ -13,6 +13,7 @@ export const defaultProfile: Profile = {
   disliked_foods: ["mushroom"],
   spice_preference: "medium",
   budget_preference: "moderate",
+  preferred_dining_styles: ["casual_restaurant", "healthy_cafe"],
   preferred_cuisines: ["mediterranean", "japanese"]
 };
 
@@ -114,4 +115,3 @@ export const sampleHistory: HistoryItem[] = [
     created_at: "2026-03-29T10:30:00Z"
   }
 ];
-

@@ -13,6 +13,7 @@ export type Profile = {
   disliked_foods: string[];
   spice_preference: string;
   budget_preference: string;
+  preferred_dining_styles: string[];
   preferred_cuisines: string[];
 };
 

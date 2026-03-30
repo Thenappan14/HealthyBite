@@ -39,6 +39,7 @@ def seed() -> None:
                 "disliked_foods": ["mushroom"],
                 "spice_preference": "medium",
                 "budget_preference": "moderate",
+                "preferred_dining_styles": ["casual_restaurant", "healthy_cafe"],
                 "preferred_cuisines": ["mediterranean", "japanese"],
             }
         )

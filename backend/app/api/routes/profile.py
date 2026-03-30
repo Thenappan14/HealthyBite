@@ -11,6 +11,8 @@ router = APIRouter()
 
 @router.get("", response_model=UserProfileRead | None)
 def get_profile(current_user: dict = Depends(get_current_user)) -> dict | None:
+    if current_user.get("profile"):
+        current_user["profile"].setdefault("preferred_dining_styles", [])
     return current_user.get("profile")
 
 
@@ -38,4 +40,7 @@ def upsert_profile(
         )
         db.user_profiles.insert_one(profile)
 
-    return strip_mongo_id(db.user_profiles.find_one({"user_id": current_user["id"]}))
+    profile = strip_mongo_id(db.user_profiles.find_one({"user_id": current_user["id"]}))
+    if profile:
+        profile.setdefault("preferred_dining_styles", [])
+    return profile

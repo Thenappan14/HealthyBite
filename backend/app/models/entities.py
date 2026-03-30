@@ -16,6 +16,7 @@ class UserProfileModel(BaseModel):
     disliked_foods: list[str] = Field(default_factory=list)
     spice_preference: str
     budget_preference: str
+    preferred_dining_styles: list[str] = Field(default_factory=list)
     preferred_cuisines: list[str] = Field(default_factory=list)
 
 
