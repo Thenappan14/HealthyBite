@@ -27,9 +27,9 @@ function Owl({
 export function OwlCluster({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
-      <div className="relative hidden h-16 w-28 items-end md:flex">
-        <Owl className="absolute left-0 bottom-0 h-14 w-14" bodyClassName="bg-[#d6f0d2]" />
-        <Owl className="absolute right-1 bottom-0 h-16 w-16" bodyClassName="bg-[#f7d98e]" />
+      <div className="relative hidden h-14 w-20 items-end lg:flex">
+        <Owl className="absolute left-0 bottom-0 h-10 w-10" bodyClassName="bg-[#d6f0d2]" />
+        <Owl className="absolute right-0 bottom-0 h-12 w-12" bodyClassName="bg-[#f7d98e]" />
       </div>
     );
   }
