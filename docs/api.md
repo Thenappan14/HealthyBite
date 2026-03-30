@@ -77,6 +77,14 @@ Request:
 
 Response includes the structured menu and enriched items.
 
+## `GET /menus`
+
+Returns menus previously ingested by the current user, including enriched menu items.
+
+## `GET /menus/{menu_id}`
+
+Returns a single structured menu with its normalized items.
+
 ## `POST /recommendations/{menu_id}`
 
 Builds recommendation results for a specific menu and the current user profile.
@@ -102,3 +110,14 @@ Each result contains:
 
 Returns saved recommendation history for the current user.
 
+## `PUT /history/{recommendation_id}/save`
+
+Marks a recommendation as saved or unsaved.
+
+Request:
+
+```json
+{
+  "saved": true
+}
+```

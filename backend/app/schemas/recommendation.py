@@ -20,3 +20,18 @@ class RecommendationResponse(BaseModel):
     top_recommendations: list[RecommendationResult]
     alternatives: list[RecommendationResult]
     dishes_to_avoid: list[RecommendationResult]
+
+
+class RecommendationHistoryItem(BaseModel):
+    id: int
+    type: str
+    score: float
+    dish_name: str
+    summary_reason: str
+    warnings: list[str]
+    saved: bool
+    created_at: str
+
+
+class RecommendationSaveRequest(BaseModel):
+    saved: bool

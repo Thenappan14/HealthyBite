@@ -23,7 +23,7 @@ export default async function SavedPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold text-foreground">{item.dish_name}</h3>
                 <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-                  {item.type} • {Math.round(item.score)}
+                  {item.type} - {Math.round(item.score)}
                 </span>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">{item.summary_reason}</p>

@@ -96,8 +96,11 @@ Frontend runs at `http://localhost:3000`.
 - `PUT /api/profile`
 - `POST /api/uploads`
 - `POST /api/ingest/url`
+- `GET /api/menus`
+- `GET /api/menus/{menu_id}`
 - `POST /api/recommendations/{menu_id}`
 - `GET /api/history`
+- `PUT /api/history/{recommendation_id}/save`
 
 Detailed request and response notes are in [docs/api.md](/c:/Users/Projects/HealthyBite/docs/api.md).
 
