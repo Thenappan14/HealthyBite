@@ -72,6 +72,57 @@ npm run dev
 
 Frontend runs at `http://localhost:3000`.
 
+## Daily run commands
+
+Use 2 terminals.
+
+Backend terminal from [backend](/c:/Users/Projects/HealthyBite/backend):
+
+```powershell
+cd c:\Users\Projects\HealthyBite\backend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+Frontend terminal from [frontend](/c:/Users/Projects/HealthyBite/frontend):
+
+```powershell
+cd c:\Users\Projects\HealthyBite\frontend
+npm run dev
+```
+
+If dependencies are not installed yet, run these once first.
+
+Backend first-time install:
+
+```powershell
+cd c:\Users\Projects\HealthyBite\backend
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Frontend first-time install:
+
+```powershell
+cd c:\Users\Projects\HealthyBite\frontend
+npm install
+```
+
+Required backend env values in [backend/.env](/c:/Users/Projects/HealthyBite/backend/.env):
+
+```env
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DB_NAME=platewise
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_MENU_MODEL=gpt-4.1
+OPENAI_RECOMMENDATION_MODEL=gpt-4.1
+OPENAI_ENABLE_WEB_SEARCH=true
+```
+
+Required frontend env value in [frontend/.env.local](/c:/Users/Projects/HealthyBite/frontend/.env.local):
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+```
+
 ## Key product flows
 
 1. Sign up or log in.
