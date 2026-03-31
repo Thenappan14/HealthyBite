@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi import HTTPException
+from openai import APIConnectionError, APIStatusError, AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
@@ -38,6 +39,34 @@ def ingest_url(
     except RuntimeError as exc:
         logger.exception("Restaurant URL analysis unavailable")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RateLimitError as exc:
+        logger.exception("OpenAI quota exceeded during restaurant URL analysis")
+        raise HTTPException(
+            status_code=429,
+            detail="OpenAI quota exceeded. Check your OpenAI billing, credits, and project limits.",
+        ) from exc
+    except AuthenticationError as exc:
+        logger.exception("OpenAI authentication failed during restaurant URL analysis")
+        raise HTTPException(
+            status_code=401,
+            detail="OpenAI authentication failed. Check OPENAI_API_KEY in backend/.env.",
+        ) from exc
+    except APIConnectionError as exc:
+        logger.exception("OpenAI connection failed during restaurant URL analysis")
+        raise HTTPException(
+            status_code=503,
+            detail="Could not connect to OpenAI from the backend.",
+        ) from exc
+    except APIStatusError as exc:
+        logger.exception("OpenAI API status error during restaurant URL analysis")
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"OpenAI API error: {exc.status_code}"
+                if settings.env == "development"
+                else "OpenAI API returned an error during restaurant URL analysis."
+            ),
+        ) from exc
     except Exception as exc:
         logger.exception("AI website menu extraction failed for url: %s", payload.url)
         raise HTTPException(
