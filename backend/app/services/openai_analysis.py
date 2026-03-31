@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 from typing import Any
 
 from openai import OpenAI
+from pypdf import PdfReader
 
 from app.core.config import settings
 
@@ -159,12 +161,16 @@ def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:
     suffix = filename.lower()
     user_content: list[dict[str, Any]] = []
     if suffix.endswith(".pdf"):
-        file_data = base64.b64encode(content).decode("utf-8")
+        extracted_text = _extract_pdf_text(content)
         user_content.append(
             {
-                "type": "input_file",
-                "filename": filename,
-                "file_data": f"data:application/pdf;base64,{file_data}",
+                "type": "input_text",
+                "text": (
+                    f"Uploaded PDF filename: {filename}\n\n"
+                    "Below is extracted PDF text from a restaurant menu. "
+                    "Use only this menu information and make conservative estimates.\n\n"
+                    f"{extracted_text[:18000]}"
+                ),
             }
         )
     else:
@@ -290,3 +296,20 @@ def _detect_image_mime_type(filename: str) -> str:
     if filename.endswith(".webp"):
         return "image/webp"
     return "image/jpeg"
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        pages = [page.extract_text() or "" for page in reader.pages]
+    except Exception as exc:
+        raise RuntimeError(
+            "The PDF could not be read locally before AI analysis. Try a text-based PDF or a clearer image."
+        ) from exc
+
+    extracted = "\n\n".join(page.strip() for page in pages if page and page.strip())
+    if not extracted:
+        raise RuntimeError(
+            "No readable text was found in the PDF. Try a clearer PDF or upload screenshots instead."
+        )
+    return extracted
