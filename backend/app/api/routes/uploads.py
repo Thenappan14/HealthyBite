@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -12,6 +13,7 @@ from app.schemas.menu import UploadResponse
 from app.services.openai_analysis import analyze_uploaded_menu
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=UploadResponse)
@@ -32,11 +34,17 @@ async def upload_menu(
     try:
         structured = analyze_uploaded_menu(file.filename or "menu", contents)
     except RuntimeError as exc:
+        logger.exception("Upload menu analysis unavailable")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("AI menu extraction failed for upload: %s", file.filename)
         raise HTTPException(
             status_code=502,
-            detail="AI menu extraction failed for this upload. Try a clearer file or retry.",
+            detail=(
+                str(exc)
+                if settings.env == "development"
+                else "AI menu extraction failed for this upload. Try a clearer file or retry."
+            ),
         ) from exc
 
     analyzed_items = structured.get("items", [])

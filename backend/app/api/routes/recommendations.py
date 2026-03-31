@@ -1,13 +1,17 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
 from app.schemas.recommendation import RecommendationResponse, RecommendationResult
 from app.services.openai_analysis import generate_ai_recommendations
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/{menu_id}", response_model=RecommendationResponse)
@@ -32,11 +36,17 @@ def recommend_for_menu(
     try:
         result = generate_ai_recommendations(current_user["profile"], menu_items)
     except RuntimeError as exc:
+        logger.exception("Recommendation generation unavailable")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("AI recommendation generation failed for menu_id=%s", menu_id)
         raise HTTPException(
             status_code=502,
-            detail="AI recommendation generation failed for this menu.",
+            detail=(
+                str(exc)
+                if settings.env == "development"
+                else "AI recommendation generation failed for this menu."
+            ),
         ) from exc
 
     for bucket_name, rec_type in (

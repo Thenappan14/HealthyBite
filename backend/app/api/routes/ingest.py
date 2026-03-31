@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from fastapi import HTTPException
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.db.mongo import next_sequence, strip_mongo_id, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import MenuRead, UrlIngestRequest
@@ -10,6 +13,7 @@ from app.services.openai_analysis import analyze_restaurant_url
 from app.services.web_ingestion import crawl_restaurant_menu
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/url", response_model=MenuRead)
@@ -32,11 +36,17 @@ def ingest_url(
     try:
         result = analyze_restaurant_url(str(payload.url), combined_source_text)
     except RuntimeError as exc:
+        logger.exception("Restaurant URL analysis unavailable")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("AI website menu extraction failed for url: %s", payload.url)
         raise HTTPException(
             status_code=502,
-            detail="AI website menu extraction failed for this restaurant URL.",
+            detail=(
+                str(exc)
+                if settings.env == "development"
+                else "AI website menu extraction failed for this restaurant URL."
+            ),
         ) from exc
 
     analyzed_items = result.get("items", [])
