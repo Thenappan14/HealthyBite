@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:8000/api`
 
-Demo protected routes accept the `X-User-Id` header.
+Protected routes currently accept the `X-User-Id` header for the signed-in user.
 
 ## `POST /auth/signup`
 
@@ -12,8 +12,8 @@ Request body:
 
 ```json
 {
-  "email": "demo@platewise.app",
-  "password": "demo1234"
+  "email": "user@example.com",
+  "password": "strong-password"
 }
 ```
 
@@ -22,6 +22,7 @@ Response:
 ```json
 {
   "access_token": "jwt-token",
+  "user_id": 1,
   "token_type": "bearer"
 }
 ```
@@ -51,9 +52,9 @@ Important fields:
 Multipart form upload for menu files.
 
 - Accepts: `.jpg`, `.jpeg`, `.png`, `.webp`, `.pdf`
-- Extracts OCR text
-- Parses categories, dishes, descriptions, and prices
-- Enriches dishes with estimated nutrition and compatibility data
+- Uses OpenAI to read the file and structure the menu
+- Estimates likely ingredients, allergens, compatibility, and nutrition
+- Stores structured menu items for recommendation ranking
 
 Response shape:
 
@@ -75,7 +76,7 @@ Request:
 }
 ```
 
-Response includes the structured menu and enriched items.
+Response includes the structured menu and AI-extracted items.
 
 ## `GET /menus`
 
@@ -88,6 +89,7 @@ Returns a single structured menu with its normalized items.
 ## `POST /recommendations/{menu_id}`
 
 Builds recommendation results for a specific menu and the current user profile.
+The backend uses OpenAI to rank dishes, explain the reasoning, and keep the wording cautious and non-medical.
 
 Response includes:
 
@@ -105,6 +107,8 @@ Each result contains:
 - `warnings`
 - `why_recommended`
 - `why_not_recommended`
+
+The disclaimer always states that recommendations are estimated and not medical advice.
 
 ## `GET /history`
 

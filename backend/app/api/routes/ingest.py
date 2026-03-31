@@ -1,14 +1,19 @@
+import logging
+
 from fastapi import APIRouter, Depends
+from fastapi import HTTPException
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.db.mongo import next_sequence, strip_mongo_id, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import MenuRead, UrlIngestRequest
-from app.services.nutrition import enrich_menu_items
+from app.services.openai_analysis import analyze_restaurant_url
 from app.services.web_ingestion import crawl_restaurant_menu
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/url", response_model=MenuRead)
@@ -17,16 +22,41 @@ def ingest_url(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> MenuRead:
-    result = crawl_restaurant_menu(str(payload.url))
-    enriched_items = enrich_menu_items(result["items"])
-    result["items"] = enriched_items
+    website_context = crawl_restaurant_menu(str(payload.url))
+    combined_source_text = "\n\n".join(
+        filter(
+            None,
+            [
+                website_context.get("raw_text"),
+                website_context.get("html_excerpt"),
+                "\n".join(website_context.get("parser_notes", [])),
+            ],
+        )
+    )
+    try:
+        result = analyze_restaurant_url(str(payload.url), combined_source_text)
+    except RuntimeError as exc:
+        logger.exception("Restaurant URL analysis unavailable")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("AI website menu extraction failed for url: %s", payload.url)
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                str(exc)
+                if settings.env == "development"
+                else "AI website menu extraction failed for this restaurant URL."
+            ),
+        ) from exc
+
+    analyzed_items = result.get("items", [])
 
     restaurant_id = next_sequence(db, "restaurants")
     db.restaurants.insert_one(
         with_timestamps(
             {
                 "id": restaurant_id,
-                "name": result["restaurant_name"],
+                "name": result.get("restaurant_name") or "Unknown restaurant",
                 "website_url": str(payload.url),
                 "cuisine_tags": result.get("cuisine_tags", []),
                 "source_type": "url",
@@ -43,13 +73,13 @@ def ingest_url(
                 "source_type": "url",
                 "source_url": str(payload.url),
                 "source_filename": None,
-                "extracted_text": result.get("raw_text"),
+                "extracted_text": result.get("source_summary"),
                 "structured_json": result,
             }
         )
     )
 
-    for item in enriched_items:
+    for item in analyzed_items:
         db.menu_items.insert_one(
             with_timestamps(
                 {
@@ -78,7 +108,10 @@ def ingest_url(
                 "file_type": "url",
                 "source_url": str(payload.url),
                 "processing_status": "completed",
-                "notes": "Parsed with sample restaurant website parser logic.",
+                "notes": (
+                    "Fetched website text and analyzed with OpenAI for structured menu extraction "
+                    "and estimated nutrition."
+                ),
             }
         )
     )
