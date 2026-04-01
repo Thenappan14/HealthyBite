@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, history, ingest, menus, profile, recommendations, uploads
+from app.api.routes import auth, debug, history, ingest, menus, profile, recommendations, uploads
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -12,3 +12,4 @@ api_router.include_router(
     recommendations.router, prefix="/recommendations", tags=["recommendations"]
 )
 api_router.include_router(history.router, prefix="/history", tags=["history"])
+api_router.include_router(debug.router, prefix="/debug", tags=["debug"])
