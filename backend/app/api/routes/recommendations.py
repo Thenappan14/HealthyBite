@@ -1,15 +1,13 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from openai import APIConnectionError, APIStatusError, AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
 from app.schemas.recommendation import RecommendationResponse, RecommendationResult
-from app.services.openai_analysis import generate_ai_recommendations
+from app.services.recommender import build_menu_item_models, build_profile_model, generate_recommendations
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,49 +32,10 @@ def recommend_for_menu(
     if not menu_items:
         raise HTTPException(status_code=400, detail="No menu items were extracted for this menu.")
 
-    try:
-        result = generate_ai_recommendations(current_user["profile"], menu_items)
-    except RuntimeError as exc:
-        logger.exception("Recommendation generation unavailable")
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except RateLimitError as exc:
-        logger.exception("OpenAI quota exceeded during recommendation generation")
-        raise HTTPException(
-            status_code=429,
-            detail="OpenAI quota exceeded. Check your OpenAI billing, credits, and project limits.",
-        ) from exc
-    except AuthenticationError as exc:
-        logger.exception("OpenAI authentication failed during recommendation generation")
-        raise HTTPException(
-            status_code=401,
-            detail="OpenAI authentication failed. Check OPENAI_API_KEY in backend/.env.",
-        ) from exc
-    except APIConnectionError as exc:
-        logger.exception("OpenAI connection failed during recommendation generation")
-        raise HTTPException(
-            status_code=503,
-            detail="Could not connect to OpenAI from the backend.",
-        ) from exc
-    except APIStatusError as exc:
-        logger.exception("OpenAI API status error during recommendation generation")
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"OpenAI API error: {exc.status_code}"
-                if settings.env == "development"
-                else "OpenAI API returned an error during recommendation generation."
-            ),
-        ) from exc
-    except Exception as exc:
-        logger.exception("AI recommendation generation failed for menu_id=%s", menu_id)
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                str(exc)
-                if settings.env == "development"
-                else "AI recommendation generation failed for this menu."
-            ),
-        ) from exc
+    result = generate_recommendations(
+        build_profile_model(current_user["profile"]),
+        build_menu_item_models(menu_items),
+    )
 
     for bucket_name, rec_type in (
         ("top_recommendations", "top_pick"),

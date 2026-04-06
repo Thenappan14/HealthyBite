@@ -4,7 +4,6 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from gridfs import GridFS
-from openai import APIConnectionError, APIStatusError, AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
@@ -12,7 +11,9 @@ from app.core.config import settings
 from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import UploadResponse
-from app.services.openai_analysis import analyze_uploaded_menu
+from app.services.menu_parser import normalize_menu_text
+from app.services.nutrition import enrich_menu_items
+from app.services.ocr import extract_text_from_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -54,15 +55,22 @@ async def upload_menu(
                     "gridfs_id": str(gridfs_id),
                     "content_type": file.content_type or "application/octet-stream",
                 },
-                "notes": "File stored successfully. Waiting for AI extraction.",
+                "notes": "File stored successfully. Waiting for local OCR/text extraction.",
             }
         )
     )
 
     try:
-        structured = analyze_uploaded_menu(file.filename or "menu", contents)
-    except RuntimeError as exc:
-        logger.exception("Upload menu analysis unavailable")
+        extracted_text = extract_text_from_upload(file.filename or "menu", contents)
+        if not extracted_text.strip():
+            raise RuntimeError(
+                "No readable text was found in the uploaded file. Try a text PDF or a clearer image."
+            )
+        structured = normalize_menu_text(extracted_text)
+        analyzed_items = enrich_menu_items(structured.get("items", []))
+        structured["items"] = analyzed_items
+    except Exception as exc:
+        logger.exception("Local upload analysis failed for upload: %s", file.filename)
         db.upload_records.update_one(
             {"id": upload_id},
             {
@@ -76,133 +84,14 @@ async def upload_menu(
             },
         )
         raise HTTPException(
-            status_code=503,
-            detail={"message": str(exc), "upload_id": upload_id, "stored": True},
-        ) from exc
-    except RateLimitError as exc:
-        logger.exception("OpenAI quota exceeded during upload analysis")
-        db.upload_records.update_one(
-            {"id": upload_id},
-            {
-                "$set": with_timestamps(
-                    {
-                        "processing_status": "failed",
-                        "notes": "OpenAI quota exceeded during upload analysis.",
-                    },
-                    update=True,
-                )
-            },
-        )
-        raise HTTPException(
-            status_code=429,
+            status_code=422,
             detail={
-                "message": "OpenAI quota exceeded. Check your OpenAI billing, credits, and project limits.",
-                "upload_id": upload_id,
-                "stored": True,
-            },
-        ) from exc
-    except AuthenticationError as exc:
-        logger.exception("OpenAI authentication failed during upload analysis")
-        db.upload_records.update_one(
-            {"id": upload_id},
-            {
-                "$set": with_timestamps(
-                    {
-                        "processing_status": "failed",
-                        "notes": "OpenAI authentication failed during upload analysis.",
-                    },
-                    update=True,
-                )
-            },
-        )
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "message": "OpenAI authentication failed. Check OPENAI_API_KEY in backend/.env.",
-                "upload_id": upload_id,
-                "stored": True,
-            },
-        ) from exc
-    except APIConnectionError as exc:
-        logger.exception("OpenAI connection failed during upload analysis")
-        db.upload_records.update_one(
-            {"id": upload_id},
-            {
-                "$set": with_timestamps(
-                    {
-                        "processing_status": "failed",
-                        "notes": "Could not connect to OpenAI from the backend.",
-                    },
-                    update=True,
-                )
-            },
-        )
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "message": "Could not connect to OpenAI from the backend.",
-                "upload_id": upload_id,
-                "stored": True,
-            },
-        ) from exc
-    except APIStatusError as exc:
-        logger.exception("OpenAI API status error during upload analysis")
-        db.upload_records.update_one(
-            {"id": upload_id},
-            {
-                "$set": with_timestamps(
-                    {
-                        "processing_status": "failed",
-                        "notes": f"OpenAI API error: {exc.status_code}",
-                    },
-                    update=True,
-                )
-            },
-        )
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": (
-                    f"OpenAI API error: {exc.status_code}"
-                    if settings.env == "development"
-                    else "OpenAI API returned an error during upload analysis."
-                ),
-                "upload_id": upload_id,
-                "stored": True,
-            },
-        ) from exc
-    except Exception as exc:
-        logger.exception("AI menu extraction failed for upload: %s", file.filename)
-        db.upload_records.update_one(
-            {"id": upload_id},
-            {
-                "$set": with_timestamps(
-                    {
-                        "processing_status": "failed",
-                        "notes": (
-                            str(exc)
-                            if settings.env == "development"
-                            else "AI menu extraction failed for this upload."
-                        ),
-                    },
-                    update=True,
-                )
-            },
-        )
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": (
-                    str(exc)
-                    if settings.env == "development"
-                    else "AI menu extraction failed for this upload. Try a clearer file or retry."
-                ),
+                "message": str(exc),
                 "upload_id": upload_id,
                 "stored": True,
             },
         ) from exc
 
-    analyzed_items = structured.get("items", [])
     extracted_preview = structured.get("source_summary") or (
         "\n".join(
             filter(
@@ -223,7 +112,7 @@ async def upload_menu(
             "source_type": "upload",
             "source_filename": file.filename,
             "source_url": None,
-            "extracted_text": extracted_preview,
+            "extracted_text": extracted_text,
             "structured_json": structured,
         }
     )
@@ -256,8 +145,8 @@ async def upload_menu(
                     "menu_id": menu_id,
                     "processing_status": "completed",
                     "notes": (
-                        "File stored successfully, then analyzed with OpenAI and saved "
-                        "as structured estimated nutrition data."
+                        "File stored successfully, then parsed with local OCR/text extraction "
+                        "and rule-based nutrition estimation."
                     ),
                 },
                 update=True,

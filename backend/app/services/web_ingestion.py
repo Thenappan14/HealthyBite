@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 
 def crawl_restaurant_menu(url: str) -> dict:
-    """Fetch website context for downstream LLM-based menu extraction."""
+    """Fetch website text for local menu parsing."""
 
     response = httpx.get(url, timeout=10.0, follow_redirects=True)
     response.raise_for_status()
@@ -18,9 +18,9 @@ def crawl_restaurant_menu(url: str) -> dict:
     return {
         "restaurant_name": restaurant_name,
         "source_url": url,
-        "raw_text": soup.get_text("\n", strip=True)[:2500],
+        "raw_text": soup.get_text("\n", strip=True)[:4000],
         "html_excerpt": html[:12000],
         "parser_notes": [
-            "Fetched the supplied URL for downstream LLM-based menu extraction.",
+            "Fetched the supplied URL for local menu parsing.",
         ],
     }

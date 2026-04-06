@@ -2,15 +2,14 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi import HTTPException
-from openai import APIConnectionError, APIStatusError, AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.db.mongo import next_sequence, strip_mongo_id, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import MenuRead, UrlIngestRequest
-from app.services.openai_analysis import analyze_restaurant_url
+from app.services.menu_parser import normalize_menu_text
+from app.services.nutrition import enrich_menu_items
 from app.services.web_ingestion import crawl_restaurant_menu
 
 router = APIRouter()
@@ -23,62 +22,16 @@ def ingest_url(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> MenuRead:
-    website_context = crawl_restaurant_menu(str(payload.url))
-    combined_source_text = "\n\n".join(
-        filter(
-            None,
-            [
-                website_context.get("raw_text"),
-                website_context.get("html_excerpt"),
-                "\n".join(website_context.get("parser_notes", [])),
-            ],
-        )
-    )
     try:
-        result = analyze_restaurant_url(str(payload.url), combined_source_text)
-    except RuntimeError as exc:
-        logger.exception("Restaurant URL analysis unavailable")
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except RateLimitError as exc:
-        logger.exception("OpenAI quota exceeded during restaurant URL analysis")
-        raise HTTPException(
-            status_code=429,
-            detail="OpenAI quota exceeded. Check your OpenAI billing, credits, and project limits.",
-        ) from exc
-    except AuthenticationError as exc:
-        logger.exception("OpenAI authentication failed during restaurant URL analysis")
-        raise HTTPException(
-            status_code=401,
-            detail="OpenAI authentication failed. Check OPENAI_API_KEY in backend/.env.",
-        ) from exc
-    except APIConnectionError as exc:
-        logger.exception("OpenAI connection failed during restaurant URL analysis")
-        raise HTTPException(
-            status_code=503,
-            detail="Could not connect to OpenAI from the backend.",
-        ) from exc
-    except APIStatusError as exc:
-        logger.exception("OpenAI API status error during restaurant URL analysis")
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"OpenAI API error: {exc.status_code}"
-                if settings.env == "development"
-                else "OpenAI API returned an error during restaurant URL analysis."
-            ),
-        ) from exc
+        result = crawl_restaurant_menu(str(payload.url))
     except Exception as exc:
-        logger.exception("AI website menu extraction failed for url: %s", payload.url)
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                str(exc)
-                if settings.env == "development"
-                else "AI website menu extraction failed for this restaurant URL."
-            ),
-        ) from exc
+        logger.exception("Website ingestion failed for url: %s", payload.url)
+        raise HTTPException(status_code=502, detail="Could not fetch the restaurant URL.") from exc
 
-    analyzed_items = result.get("items", [])
+    normalized = normalize_menu_text(result.get("raw_text", ""))
+    analyzed_items = enrich_menu_items(normalized.get("items", []))
+    result["items"] = analyzed_items
+    result["parser_notes"] = result.get("parser_notes", []) + normalized.get("parser_notes", [])
 
     restaurant_id = next_sequence(db, "restaurants")
     db.restaurants.insert_one(
@@ -102,7 +55,7 @@ def ingest_url(
                 "source_type": "url",
                 "source_url": str(payload.url),
                 "source_filename": None,
-                "extracted_text": result.get("source_summary"),
+                "extracted_text": result.get("raw_text"),
                 "structured_json": result,
             }
         )
@@ -138,8 +91,8 @@ def ingest_url(
                 "source_url": str(payload.url),
                 "processing_status": "completed",
                 "notes": (
-                    "Fetched website text and analyzed with OpenAI for structured menu extraction "
-                    "and estimated nutrition."
+                    "Fetched website text and parsed it locally into menu items with "
+                    "rule-based nutrition estimation."
                 ),
             }
         )
