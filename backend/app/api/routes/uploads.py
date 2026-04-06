@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from openai import APIConnectionError, APIStatusError, AuthenticationError, RateLimitError
+from gridfs import GridFS
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
@@ -11,7 +11,9 @@ from app.core.config import settings
 from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import UploadResponse
-from app.services.openai_analysis import analyze_uploaded_menu
+from app.services.menu_parser import normalize_menu_text
+from app.services.nutrition import enrich_menu_items
+from app.services.ocr import extract_text_from_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -27,56 +29,69 @@ async def upload_menu(
     if suffix not in {".jpg", ".jpeg", ".png", ".pdf", ".webp"}:
         raise HTTPException(status_code=400, detail="Only images and PDFs are supported.")
 
+    upload_id = next_sequence(db, "upload_records")
     os.makedirs(settings.upload_dir, exist_ok=True)
-    file_path = Path(settings.upload_dir) / (file.filename or "menu-upload")
+    file_path = Path(settings.upload_dir) / f"{upload_id}-{file.filename or 'menu-upload'}"
     contents = await file.read()
     file_path.write_bytes(contents)
+    gridfs_id = GridFS(db).put(
+        contents,
+        filename=file.filename or f"upload-{upload_id}",
+        content_type=file.content_type or "application/octet-stream",
+    )
+
+    db.upload_records.insert_one(
+        with_timestamps(
+            {
+                "id": upload_id,
+                "user_id": current_user["id"],
+                "menu_id": None,
+                "file_name": file.filename,
+                "file_type": suffix.replace(".", ""),
+                "source_url": None,
+                "processing_status": "processing",
+                "file_path": str(file_path),
+                "file_storage": {
+                    "gridfs_id": str(gridfs_id),
+                    "content_type": file.content_type or "application/octet-stream",
+                },
+                "notes": "File stored successfully. Waiting for local OCR/text extraction.",
+            }
+        )
+    )
 
     try:
-        structured = analyze_uploaded_menu(file.filename or "menu", contents)
-    except RuntimeError as exc:
-        logger.exception("Upload menu analysis unavailable")
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except RateLimitError as exc:
-        logger.exception("OpenAI quota exceeded during upload analysis")
-        raise HTTPException(
-            status_code=429,
-            detail="OpenAI quota exceeded. Check your OpenAI billing, credits, and project limits.",
-        ) from exc
-    except AuthenticationError as exc:
-        logger.exception("OpenAI authentication failed during upload analysis")
-        raise HTTPException(
-            status_code=401,
-            detail="OpenAI authentication failed. Check OPENAI_API_KEY in backend/.env.",
-        ) from exc
-    except APIConnectionError as exc:
-        logger.exception("OpenAI connection failed during upload analysis")
-        raise HTTPException(
-            status_code=503,
-            detail="Could not connect to OpenAI from the backend.",
-        ) from exc
-    except APIStatusError as exc:
-        logger.exception("OpenAI API status error during upload analysis")
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"OpenAI API error: {exc.status_code}"
-                if settings.env == "development"
-                else "OpenAI API returned an error during upload analysis."
-            ),
-        ) from exc
+        extracted_text = extract_text_from_upload(file.filename or "menu", contents)
+        if not extracted_text.strip():
+            raise RuntimeError(
+                "No readable text was found in the uploaded file. Try a text PDF or a clearer image."
+            )
+        structured = normalize_menu_text(extracted_text)
+        analyzed_items = enrich_menu_items(structured.get("items", []))
+        structured["items"] = analyzed_items
     except Exception as exc:
-        logger.exception("AI menu extraction failed for upload: %s", file.filename)
+        logger.exception("Local upload analysis failed for upload: %s", file.filename)
+        db.upload_records.update_one(
+            {"id": upload_id},
+            {
+                "$set": with_timestamps(
+                    {
+                        "processing_status": "failed",
+                        "notes": str(exc),
+                    },
+                    update=True,
+                )
+            },
+        )
         raise HTTPException(
-            status_code=502,
-            detail=(
-                str(exc)
-                if settings.env == "development"
-                else "AI menu extraction failed for this upload. Try a clearer file or retry."
-            ),
+            status_code=422,
+            detail={
+                "message": str(exc),
+                "upload_id": upload_id,
+                "stored": True,
+            },
         ) from exc
 
-    analyzed_items = structured.get("items", [])
     extracted_preview = structured.get("source_summary") or (
         "\n".join(
             filter(
@@ -97,7 +112,7 @@ async def upload_menu(
             "source_type": "upload",
             "source_filename": file.filename,
             "source_url": None,
-            "extracted_text": extracted_preview,
+            "extracted_text": extracted_text,
             "structured_json": structured,
         }
     )
@@ -122,23 +137,21 @@ async def upload_menu(
             )
         )
 
-    upload_id = next_sequence(db, "upload_records")
-    db.upload_records.insert_one(
-        with_timestamps(
-            {
-                "id": upload_id,
-                "user_id": current_user["id"],
-                "menu_id": menu_id,
-                "file_name": file.filename,
-                "file_type": suffix.replace(".", ""),
-                "source_url": None,
-                "processing_status": "completed",
-                "notes": (
-                    "Analyzed with OpenAI vision/document understanding and structured "
-                    "estimated nutrition extraction."
-                ),
-            }
-        )
+    db.upload_records.update_one(
+        {"id": upload_id},
+        {
+            "$set": with_timestamps(
+                {
+                    "menu_id": menu_id,
+                    "processing_status": "completed",
+                    "notes": (
+                        "File stored successfully, then parsed with local OCR/text extraction "
+                        "and rule-based nutrition estimation."
+                    ),
+                },
+                update=True,
+            )
+        },
     )
     return UploadResponse(
         upload_id=upload_id,

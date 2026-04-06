@@ -147,7 +147,11 @@ def get_openai_client() -> OpenAI:
         raise RuntimeError(
             "OPENAI_API_KEY is missing. Add it to backend/.env before running AI analysis."
         )
-    return OpenAI(api_key=settings.openai_api_key)
+    return OpenAI(
+        api_key=settings.openai_api_key,
+        organization=settings.openai_organization,
+        project=settings.openai_project,
+    )
 
 
 def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:

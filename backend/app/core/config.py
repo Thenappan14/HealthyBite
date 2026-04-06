@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     mongodb_url: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "platewise"
     openai_api_key: str | None = None
+    openai_organization: str | None = None
+    openai_project: str | None = None
     openai_menu_model: str = "gpt-4.1"
     openai_recommendation_model: str = "gpt-4.1"
     openai_enable_web_search: bool = True
