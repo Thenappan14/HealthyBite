@@ -21,11 +21,13 @@ Your [backend/.env](/c:/Users/Projects/HealthyBite/backend/.env) should include:
 ```env
 MONGODB_URL=mongodb://localhost:27017
 MONGODB_DB_NAME=platewise
-OPENAI_API_KEY=your_openai_key_here
-OPENAI_MENU_MODEL=gpt-4.1
-OPENAI_RECOMMENDATION_MODEL=gpt-4.1
-OPENAI_ENABLE_WEB_SEARCH=true
 ```
+
+Local OCR notes:
+
+- Text PDFs work through `pypdf`
+- Images require Tesseract OCR installed locally
+- Scanned PDFs require both Tesseract OCR and Poppler on Windows because `pdf2image` converts PDF pages into images before OCR
 
 ## Frontend
 
