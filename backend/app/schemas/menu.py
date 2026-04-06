@@ -7,6 +7,21 @@ class UploadResponse(BaseModel):
     extracted_preview: str
 
 
+class UploadRecordRead(BaseModel):
+    id: int
+    user_id: int
+    menu_id: int | None = None
+    file_name: str | None = None
+    file_type: str | None = None
+    source_url: str | None = None
+    processing_status: str
+    notes: str | None = None
+    file_path: str | None = None
+    extracted_preview: str | None = None
+    created_at: str
+    updated_at: str
+
+
 class UrlIngestRequest(BaseModel):
     url: HttpUrl
 
@@ -36,4 +51,3 @@ class MenuRead(BaseModel):
     items: list[MenuItemRead]
 
     model_config = {"from_attributes": True}
-
