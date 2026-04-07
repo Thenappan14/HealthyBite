@@ -1,49 +1,64 @@
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 
-INGREDIENT_HINTS = {
-    "salmon": {"protein": 30, "fat": 18, "carbs": 12, "fiber": 4, "sugar": 4, "sodium": 520, "calories": 410, "allergens": ["fish"], "diets": ["pescatarian", "halal"]},
-    "chicken": {"protein": 32, "fat": 14, "carbs": 16, "fiber": 3, "sugar": 4, "sodium": 620, "calories": 420, "allergens": [], "diets": ["halal"]},
-    "tofu": {"protein": 20, "fat": 14, "carbs": 18, "fiber": 6, "sugar": 4, "sodium": 480, "calories": 350, "allergens": ["soy"], "diets": ["vegetarian", "vegan", "halal"]},
-    "mushroom": {"protein": 12, "fat": 16, "carbs": 45, "fiber": 5, "sugar": 6, "sodium": 690, "calories": 460, "allergens": [], "diets": ["vegetarian"]},
-    "steak": {"protein": 36, "fat": 25, "carbs": 32, "fiber": 2, "sugar": 3, "sodium": 780, "calories": 620, "allergens": [], "diets": ["halal"]},
-    "yogurt": {"protein": 13, "fat": 8, "carbs": 30, "fiber": 4, "sugar": 20, "sodium": 180, "calories": 290, "allergens": ["dairy"], "diets": ["vegetarian", "gluten_free"]},
-    "pasta": {"protein": 15, "fat": 20, "carbs": 68, "fiber": 5, "sugar": 7, "sodium": 720, "calories": 560, "allergens": ["gluten", "dairy"], "diets": ["vegetarian"]},
-    "salad": {"protein": 10, "fat": 12, "carbs": 20, "fiber": 7, "sugar": 5, "sodium": 320, "calories": 260, "allergens": [], "diets": ["vegetarian", "vegan", "gluten_free", "halal", "pescatarian"]},
-    "cake": {"protein": 6, "fat": 24, "carbs": 58, "fiber": 1, "sugar": 38, "sodium": 340, "calories": 520, "allergens": ["gluten", "dairy", "eggs"], "diets": ["vegetarian"]},
-    "broccoli": {"protein": 8, "fat": 7, "carbs": 16, "fiber": 7, "sugar": 4, "sodium": 180, "calories": 160, "allergens": [], "diets": ["vegetarian", "vegan", "gluten_free", "halal", "pescatarian"]},
-}
+DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "ingredient_profiles.json"
 
 STRICT_DIETS = {
-    "vegetarian": {"blocked_terms": ["chicken", "steak", "fish", "salmon", "beef", "pork"]},
-    "vegan": {"blocked_terms": ["chicken", "steak", "fish", "salmon", "beef", "pork", "cheese", "cream", "yogurt", "butter", "egg", "parmesan"]},
+    "vegetarian": {"blocked_terms": ["chicken", "steak", "fish", "salmon", "beef", "pork", "lamb", "duck", "shrimp", "prawn"]},
+    "vegan": {"blocked_terms": ["chicken", "steak", "fish", "salmon", "beef", "pork", "lamb", "duck", "shrimp", "prawn", "cheese", "cream", "yogurt", "butter", "egg", "parmesan", "milk"]},
     "halal": {"blocked_terms": ["pork", "bacon", "ham", "wine", "beer"]},
     "hindu_friendly": {"blocked_terms": ["beef"]},
-    "buddhist_friendly": {"blocked_terms": ["beef", "pork", "chicken", "fish", "salmon", "shrimp", "prawn", "oyster"]},
+    "buddhist_friendly": {"blocked_terms": ["beef", "pork", "chicken", "fish", "salmon", "shrimp", "prawn", "oyster", "duck", "lamb"]},
     "no_beef": {"blocked_terms": ["beef"]},
     "no_pork": {"blocked_terms": ["pork", "bacon", "ham"]},
-    "pescatarian": {"blocked_terms": ["chicken", "steak", "beef", "pork"]},
+    "pescatarian": {"blocked_terms": ["chicken", "steak", "beef", "pork", "lamb", "duck"]},
     "lactose_free": {"blocked_terms": ["cream", "milk", "cheese", "yogurt", "butter", "parmesan"]},
-    "gluten_free": {"blocked_terms": ["pasta", "bread", "soy sauce", "flour", "wheat", "noodle"]},
+    "gluten_free": {"blocked_terms": ["pasta", "bread", "soy sauce", "flour", "wheat", "noodle", "bun", "tempura"]}
+}
+
+PORTION_MODIFIERS = {
+    "large": 1.35,
+    "double": 1.45,
+    "sharing": 1.6,
+    "small": 0.8,
+    "mini": 0.65,
+    "light": 0.85
+}
+
+COOKING_ADJUSTMENTS = {
+    "fried": {"calories": 1.22, "fat": 1.35, "sodium": 1.15},
+    "crispy": {"calories": 1.18, "fat": 1.25, "sodium": 1.1},
+    "tempura": {"calories": 1.18, "fat": 1.28, "sodium": 1.08},
+    "grilled": {"calories": 0.96, "fat": 0.95, "sodium": 0.96},
+    "steamed": {"calories": 0.9, "fat": 0.88, "sodium": 0.94},
+    "roasted": {"calories": 1.02, "fat": 1.04, "sodium": 0.98},
+    "creamy": {"calories": 1.16, "fat": 1.22, "sodium": 1.08},
+    "cheesy": {"calories": 1.14, "fat": 1.18, "sodium": 1.12},
+    "spicy": {"sodium": 1.05},
+    "soup": {"sodium": 1.12}
 }
 
 
 def enrich_menu_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
+    ingredient_index = _ingredient_index()
     for item in items:
         merged_text = f"{item.get('name', '')} {item.get('description', '')}".lower()
-        matched = [name for name in INGREDIENT_HINTS if name in merged_text]
-        template = _combine_templates(matched)
+        matched_profiles = _match_ingredient_profiles(merged_text, ingredient_index)
+        template = _estimate_from_ingredients(matched_profiles, merged_text)
         allergens = sorted(set(template["allergens"] + _keyword_allergens(merged_text)))
         diets = _compatible_diets(merged_text, template["diets"])
-        confidence = round(min(0.95, 0.45 + 0.1 * len(matched)), 2)
+        confidence = _estimate_confidence(matched_profiles, merged_text)
 
         enriched.append(
             {
                 **item,
-                "inferred_ingredients": matched or _infer_ingredients(merged_text),
+                "inferred_ingredients": [entry["name"] for entry in matched_profiles] or _infer_ingredients(merged_text),
                 "nutrition_estimate": {
                     "calories": template["calories"],
                     "protein_g": template["protein"],
@@ -51,17 +66,24 @@ def enrich_menu_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "fat_g": template["fat"],
                     "fiber_g": template["fiber"],
                     "sugar_g": template["sugar"],
-                    "sodium_mg": template["sodium"],
+                    "sodium_mg": template["sodium"]
                 },
                 "allergens": allergens,
                 "diet_compatibility": diets,
-                "confidence_score": confidence,
+                "confidence_score": confidence
             }
         )
     return enriched
 
 
-def _combine_templates(matched: list[str]) -> dict[str, Any]:
+@lru_cache
+def _ingredient_index() -> list[dict[str, Any]]:
+    with DATA_PATH.open("r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+    return [{"name": name, **payload} for name, payload in raw.items()]
+
+
+def _estimate_from_ingredients(matched: list[dict[str, Any]], text: str) -> dict[str, Any]:
     if not matched:
         return {
             "calories": 420,
@@ -72,33 +94,62 @@ def _combine_templates(matched: list[str]) -> dict[str, Any]:
             "sugar": 7,
             "sodium": 520,
             "allergens": [],
-            "diets": ["none"],
+            "diets": ["none"]
         }
 
     totals = {
-        "calories": 0,
-        "protein": 0,
-        "carbs": 0,
-        "fat": 0,
-        "fiber": 0,
-        "sugar": 0,
-        "sodium": 0,
+        "calories": 0.0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0.0
     }
     allergens: list[str] = []
     diets: list[str] = []
 
-    for key in matched:
-        template = INGREDIENT_HINTS[key]
+    for template in matched:
         for macro in totals:
-            totals[macro] += template[macro]
+            totals[macro] += float(template[macro])
         allergens.extend(template["allergens"])
         diets.extend(template["diets"])
 
-    count = len(matched)
-    averaged = {macro: round(value / count, 1) for macro, value in totals.items()}
+    averaged = {macro: round(value / len(matched), 1) for macro, value in totals.items()}
+    averaged = _apply_portion_adjustments(averaged, text)
+    averaged = _apply_cooking_adjustments(averaged, text)
     averaged["allergens"] = allergens
     averaged["diets"] = sorted(set(diets))
     return averaged
+
+
+def _match_ingredient_profiles(text: str, ingredient_index: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    matched: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in ingredient_index:
+        for alias in entry.get("aliases", []):
+            if alias in text and entry["name"] not in seen:
+                matched.append(entry)
+                seen.add(entry["name"])
+                break
+    return matched
+
+
+def _apply_portion_adjustments(template: dict[str, float], text: str) -> dict[str, float]:
+    multiplier = 1.0
+    for token, value in PORTION_MODIFIERS.items():
+        if token in text:
+            multiplier = max(multiplier, value)
+    return {macro: round(amount * multiplier, 1) for macro, amount in template.items()}
+
+
+def _apply_cooking_adjustments(template: dict[str, float], text: str) -> dict[str, float]:
+    adjusted = dict(template)
+    for token, changes in COOKING_ADJUSTMENTS.items():
+        if token in text:
+            for macro, multiplier in changes.items():
+                adjusted[macro] = round(adjusted[macro] * multiplier, 1)
+    return adjusted
 
 
 def _keyword_allergens(text: str) -> list[str]:
@@ -112,6 +163,8 @@ def _keyword_allergens(text: str) -> list[str]:
         "cream": "dairy",
         "soy": "soy",
         "parmesan": "dairy",
+        "milk": "dairy",
+        "nut": "tree nuts"
     }
     return [label for token, label in mappings.items() if token in text]
 
@@ -130,5 +183,16 @@ def _compatible_diets(text: str, default_diets: list[str]) -> list[str]:
 
 
 def _infer_ingredients(text: str) -> list[str]:
-    candidates = ["rice", "greens", "tomato", "garlic", "avocado", "herbs"]
-    return [item for item in candidates if item in text][:4] or ["mixed ingredients"]
+    candidates = ["rice", "leafy_greens", "tomato", "sauce", "avocado", "vegetable_mix", "beans"]
+    return [item for item in candidates if item.replace("_", " ") in text or item in text][:4] or ["mixed ingredients"]
+
+
+def _estimate_confidence(matched: list[dict[str, Any]], text: str) -> float:
+    base = 0.42
+    if matched:
+        base += min(0.35, 0.09 * len(matched))
+    if any(token in text for token in ["with", "served", "includes", "topped", "sauce"]):
+        base += 0.08
+    if len(text.split()) > 10:
+        base += 0.05
+    return round(min(0.94, base), 2)
