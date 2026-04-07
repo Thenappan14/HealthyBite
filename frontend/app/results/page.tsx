@@ -60,19 +60,13 @@ export default function ResultsPage() {
     );
   }
 
-  const activeMenuId = requestedMenuId || menu.id;
-
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 md:px-6">
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Results</p>
-        <h1 className="font-display text-5xl">Ranked dishes with estimated nutrition and reasoning</h1>
-        <p className="max-w-3xl text-muted-foreground">
-          Each result balances hard exclusions with softer profile fit signals like protein, calories, fiber, sodium, sugar, preferences, and budget.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Showing recommendations for menu #{activeMenuId} from {menu.source_filename ?? menu.source_url ?? "your latest analysis"}.
-        </p>
+        <h1 className="font-display text-5xl leading-tight md:text-6xl">
+          Ranked dishes with estimated nutrition and reasoning
+        </h1>
       </div>
 
       <div className="mt-8">
@@ -81,8 +75,10 @@ export default function ResultsPage() {
 
       <section className="mt-8">
         <Card>
-          <CardTitle>Top 3 recommendations</CardTitle>
-          <CardDescription className="mt-2">Best overall fit based on provided profile information and menu details.</CardDescription>
+          <CardTitle className="text-3xl md:text-4xl">Top 3 recommendations</CardTitle>
+          <CardDescription className="mt-3 text-lg">
+            Best overall fit based on provided profile information and menu details.
+          </CardDescription>
           <div className="mt-6 grid gap-5 lg:grid-cols-3">
             {results.top_recommendations.map((dish) => (
               <DishCard key={dish.menu_item_id} dish={dish} />
@@ -93,17 +89,17 @@ export default function ResultsPage() {
 
       <section className="mt-8 grid gap-8 lg:grid-cols-2">
         <Card>
-          <CardTitle>Alternative options</CardTitle>
+          <CardTitle className="text-3xl md:text-4xl">Alternative options</CardTitle>
           <div className="mt-6 space-y-5">
             {results.alternatives.length ? (
               results.alternatives.map((dish) => <DishCard key={dish.menu_item_id} dish={dish} />)
             ) : (
-              <p className="text-sm text-muted-foreground">No additional alternatives were generated for this menu.</p>
+              <p className="text-base text-muted-foreground">No additional alternatives were generated for this menu.</p>
             )}
           </div>
         </Card>
         <Card>
-          <CardTitle>Dishes to avoid</CardTitle>
+          <CardTitle className="text-3xl md:text-4xl">Dishes to avoid</CardTitle>
           <div className="mt-6 space-y-5">
             {results.dishes_to_avoid.map((dish) => (
               <DishCard key={dish.menu_item_id} dish={dish} tone="danger" />
