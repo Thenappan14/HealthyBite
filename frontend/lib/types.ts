@@ -23,6 +23,8 @@ export type MenuItem = {
   name: string;
   description?: string;
   price?: number;
+  source_page?: number;
+  source_text?: string;
   nutrition_estimate: Record<string, number>;
   allergens: string[];
   warnings?: string[];
@@ -43,6 +45,9 @@ export type Recommendation = {
   menu_item_id: number;
   dish_name: string;
   category?: string;
+  price?: number;
+  source_page?: number;
+  source_text?: string;
   match_score: number;
   summary_reason: string;
   nutrition_estimate: Record<string, number>;

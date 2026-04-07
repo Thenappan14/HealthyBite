@@ -16,27 +16,39 @@ except ImportError:  # pragma: no cover - optional dependency path
 
 
 def extract_text_from_upload(filename: str, content: bytes) -> str:
+    document = extract_document_payload(filename, content)
+    return document["text"]
+
+
+def extract_document_payload(filename: str, content: bytes) -> dict:
     suffix = Path(filename).suffix.lower()
 
     if suffix == ".pdf":
-        return _extract_pdf_text(content)
+        return _extract_pdf_document(content)
 
     if suffix in {".jpg", ".jpeg", ".png", ".webp"}:
-        return _extract_image_text(content, filename)
+        text = _extract_image_text(content, filename)
+        return {"text": text, "pages": [{"page_number": 1, "text": text}]}
 
     try:
-        return content.decode("utf-8").strip()
+        text = content.decode("utf-8").strip()
+        return {"text": text, "pages": [{"page_number": 1, "text": text}] if text else []}
     except UnicodeDecodeError:
-        return ""
+        return {"text": "", "pages": []}
 
 
-def _extract_pdf_text(content: bytes) -> str:
+def _extract_pdf_document(content: bytes) -> dict:
     reader = PdfReader(io.BytesIO(content))
-    pages = [page.extract_text() or "" for page in reader.pages]
-    extracted = "\n\n".join(page.strip() for page in pages if page and page.strip())
+    pages = []
+    for index, page in enumerate(reader.pages, start=1):
+        extracted = (page.extract_text() or "").strip()
+        if extracted:
+            pages.append({"page_number": index, "text": extracted})
+
+    extracted = "\n\n".join(page["text"] for page in pages)
     if extracted:
-        return extracted
-    return _extract_scanned_pdf_text(content)
+        return {"text": extracted, "pages": pages}
+    return _extract_scanned_pdf_document(content)
 
 
 def _extract_image_text(content: bytes, filename: str) -> str:
@@ -54,7 +66,7 @@ def _extract_image_text(content: bytes, filename: str) -> str:
     return text.strip()
 
 
-def _extract_scanned_pdf_text(content: bytes) -> str:
+def _extract_scanned_pdf_document(content: bytes) -> dict:
     if convert_from_bytes is None or pytesseract is None:
         raise RuntimeError(
             "Scanned PDF OCR requires pdf2image, pytesseract, and a local Poppler install."
@@ -68,14 +80,16 @@ def _extract_scanned_pdf_text(content: bytes) -> str:
         ) from exc
 
     page_text = []
-    for image in images:
+    pages = []
+    for index, image in enumerate(images, start=1):
         text = pytesseract.image_to_string(image).strip()
         if text:
             page_text.append(text)
+            pages.append({"page_number": index, "text": text})
 
     extracted = "\n\n".join(page_text)
     if not extracted:
         raise RuntimeError(
             "No readable text was found in the scanned PDF. Try clearer screenshots or a higher-quality scan."
         )
-    return extracted
+    return {"text": extracted, "pages": pages}

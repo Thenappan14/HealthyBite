@@ -12,9 +12,9 @@ from app.core.config import settings
 from app.db.mongo import next_sequence, strip_mongo_id, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import UploadRecordRead, UploadResponse
-from app.services.menu_parser import normalize_menu_text
+from app.services.menu_parser import normalize_menu_document
 from app.services.nutrition import enrich_menu_items
-from app.services.ocr import extract_text_from_upload
+from app.services.ocr import extract_document_payload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -89,12 +89,13 @@ async def upload_menu(
     )
 
     try:
-        extracted_text = extract_text_from_upload(file.filename or "menu", contents)
+        document_payload = extract_document_payload(file.filename or "menu", contents)
+        extracted_text = document_payload["text"]
         if not extracted_text.strip():
             raise RuntimeError(
                 "No readable text was found in the uploaded file. Try a text PDF or a clearer image."
             )
-        structured = normalize_menu_text(extracted_text)
+        structured = normalize_menu_document(document_payload)
         analyzed_items = enrich_menu_items(structured.get("items", []))
         structured["items"] = analyzed_items
     except Exception as exc:
@@ -156,6 +157,8 @@ async def upload_menu(
                     "name": item["name"],
                     "description": item.get("description"),
                     "price": item.get("price"),
+                    "source_page": item.get("source_page"),
+                    "source_text": item.get("source_text"),
                     "inferred_ingredients": item.get("inferred_ingredients", []),
                     "nutrition_estimate": item.get("nutrition_estimate", {}),
                     "allergens": item.get("allergens", []),

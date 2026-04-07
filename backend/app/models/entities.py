@@ -27,6 +27,8 @@ class MenuItemModel(BaseModel):
     name: str
     description: str | None = None
     price: float | None = None
+    source_page: int | None = None
+    source_text: str | None = None
     inferred_ingredients: list[str] = Field(default_factory=list)
     nutrition_estimate: dict = Field(default_factory=dict)
     allergens: list[str] = Field(default_factory=list)

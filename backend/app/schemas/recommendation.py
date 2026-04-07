@@ -5,6 +5,9 @@ class RecommendationResult(BaseModel):
     menu_item_id: int
     dish_name: str
     category: str | None = None
+    price: float | None = None
+    source_page: int | None = None
+    source_text: str | None = None
     match_score: float
     summary_reason: str
     nutrition_estimate: dict

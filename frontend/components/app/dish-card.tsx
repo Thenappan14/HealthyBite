@@ -22,6 +22,23 @@ export function DishCard({
         <ScoreBadge score={dish.match_score} />
       </div>
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-stone-50 p-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Exact menu name</p>
+          <p className="mt-1 text-lg text-foreground">{dish.dish_name}</p>
+          {dish.source_text ? (
+            <p className="mt-2 text-sm text-muted-foreground">{dish.source_text}</p>
+          ) : null}
+        </div>
+        <div className="rounded-2xl bg-stone-50 p-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Menu location</p>
+          <p className="mt-1 text-lg text-foreground">
+            {dish.source_page ? `PDF page ${dish.source_page}` : "Upload text match"}
+            {dish.price !== undefined && dish.price !== null ? ` | S$${dish.price.toFixed(2)}` : ""}
+          </p>
+        </div>
+      </div>
+
       <p className="mt-4 text-base leading-7 text-foreground md:text-lg">{dish.summary_reason}</p>
 
       <div className="mt-4 flex flex-wrap gap-2">
