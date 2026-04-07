@@ -5,6 +5,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import httpx
+
+from app.services.usda import lookup_ingredient_nutrition
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "ingredient_profiles.json"
 
@@ -97,25 +100,20 @@ def _estimate_from_ingredients(matched: list[dict[str, Any]], text: str) -> dict
             "diets": ["none"]
         }
 
-    totals = {
-        "calories": 0.0,
-        "protein": 0.0,
-        "carbs": 0.0,
-        "fat": 0.0,
-        "fiber": 0.0,
-        "sugar": 0.0,
-        "sodium": 0.0
-    }
+    totals = _empty_totals()
     allergens: list[str] = []
     diets: list[str] = []
+    count = 0
 
     for template in matched:
+        nutrient_source = _lookup_profile_or_usda(template)
         for macro in totals:
-            totals[macro] += float(template[macro])
+            totals[macro] += float(nutrient_source[macro])
         allergens.extend(template["allergens"])
         diets.extend(template["diets"])
+        count += 1
 
-    averaged = {macro: round(value / len(matched), 1) for macro, value in totals.items()}
+    averaged = {macro: round(value / max(count, 1), 1) for macro, value in totals.items()}
     averaged = _apply_portion_adjustments(averaged, text)
     averaged = _apply_cooking_adjustments(averaged, text)
     averaged["allergens"] = allergens
@@ -191,8 +189,50 @@ def _estimate_confidence(matched: list[dict[str, Any]], text: str) -> float:
     base = 0.42
     if matched:
         base += min(0.35, 0.09 * len(matched))
+    if _can_use_live_lookup():
+        base += 0.08
     if any(token in text for token in ["with", "served", "includes", "topped", "sauce"]):
         base += 0.08
     if len(text.split()) > 10:
         base += 0.05
     return round(min(0.94, base), 2)
+
+
+def _lookup_profile_or_usda(template: dict[str, Any]) -> dict[str, float]:
+    aliases = template.get("aliases", [])
+    queries = aliases[:2] if aliases else [template["name"]]
+    for query in queries:
+        try:
+            usda_match = lookup_ingredient_nutrition(query)
+        except httpx.HTTPError:
+            usda_match = None
+        if usda_match:
+            return usda_match["nutrition"]
+
+    return {
+        "calories": float(template["calories"]),
+        "protein": float(template["protein"]),
+        "carbs": float(template["carbs"]),
+        "fat": float(template["fat"]),
+        "fiber": float(template["fiber"]),
+        "sugar": float(template["sugar"]),
+        "sodium": float(template["sodium"]),
+    }
+
+
+def _empty_totals() -> dict[str, float]:
+    return {
+        "calories": 0.0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0.0,
+    }
+
+
+def _can_use_live_lookup() -> bool:
+    from app.core.config import settings
+
+    return bool(settings.usda_api_key)
