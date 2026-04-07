@@ -4,19 +4,47 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from gridfs import GridFS
+from pymongo import DESCENDING
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
 from app.core.config import settings
-from app.db.mongo import next_sequence, with_timestamps
+from app.db.mongo import next_sequence, strip_mongo_id, with_timestamps
 from app.db.session import get_db
-from app.schemas.menu import UploadResponse
+from app.schemas.menu import UploadRecordRead, UploadResponse
 from app.services.menu_parser import normalize_menu_text
 from app.services.nutrition import enrich_menu_items
 from app.services.ocr import extract_text_from_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get("", response_model=list[UploadRecordRead])
+def list_uploads(
+    db: Database = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> list[dict]:
+    uploads = list(
+        db.upload_records.find({"user_id": current_user["id"]}, {"_id": 0}).sort(
+            "created_at", DESCENDING
+        )
+    )
+    return [_serialize_upload_record(record, db) for record in uploads]
+
+
+@router.get("/{upload_id}", response_model=UploadRecordRead)
+def get_upload(
+    upload_id: int,
+    db: Database = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    record = strip_mongo_id(
+        db.upload_records.find_one({"id": upload_id, "user_id": current_user["id"]})
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    return _serialize_upload_record(record, db)
 
 
 @router.post("", response_model=UploadResponse)
@@ -158,3 +186,28 @@ async def upload_menu(
         menu_id=menu_id,
         extracted_preview=extracted_preview[:300],
     )
+
+
+def _serialize_upload_record(record: dict, db: Database) -> dict:
+    menu = None
+    if record.get("menu_id"):
+        menu = strip_mongo_id(db.menus.find_one({"id": record["menu_id"]}))
+
+    extracted_text = None
+    if menu:
+        extracted_text = menu.get("extracted_text")
+
+    return {
+        "id": record["id"],
+        "user_id": record["user_id"],
+        "menu_id": record.get("menu_id"),
+        "file_name": record.get("file_name"),
+        "file_type": record.get("file_type"),
+        "source_url": record.get("source_url"),
+        "processing_status": record.get("processing_status", "unknown"),
+        "notes": record.get("notes"),
+        "file_path": record.get("file_path"),
+        "extracted_preview": extracted_text[:500] if extracted_text else None,
+        "created_at": record["created_at"].isoformat(),
+        "updated_at": record["updated_at"].isoformat(),
+    }

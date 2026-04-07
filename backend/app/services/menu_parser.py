@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 
-PRICE_PATTERN = re.compile(r"(?P<currency>S?\\$)?\\s*(?P<price>\\d{1,3}(?:\\.\\d{1,2})?)$")
+PRICE_PATTERN = re.compile(r"(?P<currency>S?\$)?\s*(?P<price>\d{1,3}(?:\.\d{1,2})?)$")
 CATEGORY_HINTS = {
     "starter",
     "starters",
@@ -23,7 +23,7 @@ CATEGORY_HINTS = {
     "burgers",
     "seafood",
     "meat",
-    "ice cream",
+    "ice cream"
 }
 
 
@@ -36,7 +36,7 @@ def normalize_menu_text(text: str) -> dict[str, Any]:
     current_category: str | None = None
 
     for idx, line in enumerate(cleaned_lines):
-        normalized = re.sub(r"\\s+", " ", line)
+        normalized = re.sub(r"\s+", " ", line)
         if _is_category_line(normalized):
             current_category = normalized.title()
             continue
@@ -60,14 +60,13 @@ def normalize_menu_text(text: str) -> dict[str, Any]:
                     "category": current_category,
                     "name": name,
                     "description": description,
-                    "price": price,
+                    "price": price
                 }
             )
 
     if not items and cleaned_lines:
         parser_notes.append("Structured parsing was limited, so the menu text may need a cleaner upload.")
-        fallback_items = _fallback_chunk_items(cleaned_lines)
-        items.extend(fallback_items)
+        items.extend(_fallback_chunk_items(cleaned_lines))
 
     if not parser_notes:
         parser_notes.append("Menu text was normalized with local rule-based parsing.")
@@ -88,7 +87,7 @@ def _looks_like_menu_item(line: str) -> bool:
 
 
 def _split_name_description(line: str, next_line: str) -> tuple[str, str | None]:
-    separators = [" - ", " — ", ": "]
+    separators = [" - ", ":", " – ", " — "]
     for separator in separators:
         if separator in line:
             name, description = line.split(separator, 1)
@@ -110,7 +109,7 @@ def _fallback_chunk_items(lines: list[str]) -> list[dict[str, Any]]:
                 "category": None,
                 "name": chunk[:60].title(),
                 "description": None,
-                "price": None,
+                "price": None
             }
         )
     return items

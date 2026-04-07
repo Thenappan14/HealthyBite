@@ -21,6 +21,7 @@ Your [backend/.env](/c:/Users/Projects/HealthyBite/backend/.env) should include:
 ```env
 MONGODB_URL=mongodb://localhost:27017
 MONGODB_DB_NAME=platewise
+USDA_API_KEY=your_usda_key_here
 ```
 
 Local OCR notes:
@@ -28,6 +29,7 @@ Local OCR notes:
 - Text PDFs work through `pypdf`
 - Images require Tesseract OCR installed locally
 - Scanned PDFs require both Tesseract OCR and Poppler on Windows because `pdf2image` converts PDF pages into images before OCR
+- USDA FoodData Central is optional, but if you add `USDA_API_KEY` the backend will use live ingredient nutrition lookups before falling back to local estimates
 
 ## Frontend
 

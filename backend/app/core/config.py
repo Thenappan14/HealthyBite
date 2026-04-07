@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     openai_menu_model: str = "gpt-4.1"
     openai_recommendation_model: str = "gpt-4.1"
     openai_enable_web_search: bool = True
+    usda_api_key: str | None = None
+    usda_base_url: str = "https://api.nal.usda.gov/fdc/v1"
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
