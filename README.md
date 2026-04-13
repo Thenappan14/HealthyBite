@@ -125,9 +125,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 
 1. Sign up or log in.
 2. Complete the profile at `/profile`.
-3. Upload a menu at `/upload` or paste a restaurant URL at `/analyze-url`.
-4. Review ranked dishes at `/results`.
-5. Inspect recommendation history at `/saved`.
+3. **Quick analysis (new):** Upload menu at `/analyze` to get results with dietary filtering in one call.
+   - OR traditional flow: Upload at `/upload` or paste URL at `/analyze-url`, then view ranked dishes at `/results`.
+4. Inspect recommendation history at `/saved`.
 
 ## API summary
 
@@ -135,6 +135,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 - `POST /api/auth/login`
 - `GET /api/profile`
 - `PUT /api/profile`
+- **`POST /api/analyze` (NEW)** — Upload menu file and get dietary-filtered recommendations in one call
 - `POST /api/uploads`
 - `POST /api/ingest/url`
 - `GET /api/menus`

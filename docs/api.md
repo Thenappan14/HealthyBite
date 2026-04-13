@@ -47,6 +47,39 @@ Important fields:
 - `disliked_foods`: string array
 - `preferred_cuisines`: string array
 
+## `POST /analyze` (NEW — Combined Flow)
+
+**Recommended endpoint for single-step menu analysis.**
+
+Combines file upload, menu extraction, nutrition enrichment, and dietary-based ranking in one request.
+
+Request: Multipart form upload
+
+- Accepts: `.jpg`, `.jpeg`, `.png`, `.webp`, `.pdf`
+- Requires the user to have completed their profile (same as `/recommendations/{menu_id}`)
+
+Response:
+
+```json
+{
+  "upload_id": 1,
+  "menu_id": 1,
+  "upload_filename": "menu.pdf",
+  "extracted_preview": "Grilled Salmon: Wild-caught salmon...",
+  "disclaimer": "Recommendations are based on estimated nutrition...",
+  "top_recommendations": [...],
+  "alternatives": [...],
+  "dishes_to_avoid": [...]
+}
+```
+
+This endpoint handles all steps internally:
+1. Stores the uploaded file
+2. Extracts and OCR if needed
+3. Enriches items with estimated nutrition, allergens, ingredients
+4. Generates AI-powered recommendations based on user's dietary profile
+5. Returns ranked results immediately
+
 ## `POST /uploads`
 
 Multipart form upload for menu files.
