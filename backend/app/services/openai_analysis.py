@@ -147,11 +147,12 @@ def get_openai_client() -> OpenAI:
         raise RuntimeError(
             "OPENAI_API_KEY is missing. Add it to backend/.env before running AI analysis."
         )
-    return OpenAI(
-        api_key=settings.openai_api_key,
-        organization=settings.openai_organization,
-        project=settings.openai_project,
-    )
+    client_kwargs: dict[str, Any] = {"api_key": settings.openai_api_key}
+    if settings.openai_organization:
+        client_kwargs["organization"] = settings.openai_organization
+    if settings.openai_project:
+        client_kwargs["project"] = settings.openai_project
+    return OpenAI(**client_kwargs)
 
 
 def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:
@@ -197,64 +198,64 @@ def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:
         }
     )
 
-    response = client.responses.create(
-        model=settings.openai_menu_model,
-        input=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": user_content},
-        ],
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "menu_analysis",
-                "strict": True,
-                "schema": MENU_ANALYSIS_SCHEMA,
-            }
-        },
+    text_input = (
+        prompt + "\n\n"
+        + "Respond with a valid JSON object containing restaurant_name, source_summary, cuisine_tags, parser_notes, and items array. "
+        + "Each item should have category, name, description, price, inferred_ingredients, nutrition_estimate, allergens, diet_compatibility, and confidence_score. "
+        + "Return JSON only, no additional text.\n\n"
+        + "Content to analyze:"
     )
-    return json.loads(response.output_text)
+    for content_block in user_content:
+        if content_block.get("type") == "input_text":
+            text_input += f"\n{content_block['text']}"
+    
+    response = client.chat.completions.create(
+        model=settings.openai_menu_model,
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": text_input},
+        ],
+        temperature=0.3,
+    )
+    return json.loads(response.choices[0].message.content)
 
 
 def analyze_restaurant_url(url: str, website_text: str) -> dict[str, Any]:
     client = get_openai_client()
     user_text = (
         f"Restaurant URL: {url}\n\n"
-        "Below is scraped website text. Extract the menu into structured JSON. "
+        "Below is scraped website text. Extract the menu into a JSON object. "
         "If the text is incomplete, make careful estimates and note uncertainty.\n\n"
         f"{website_text[:12000]}"
     )
 
-    response = client.responses.create(
+    response = client.chat.completions.create(
         model=settings.openai_menu_model,
-        input=[
+        messages=[
             {
                 "role": "system",
                 "content": (
                     "You are a restaurant menu extraction assistant. Convert website content into structured menu data. "
-                    "Estimate missing descriptions or nutrition only when necessary and mark uncertainty via confidence."
+                    "Respond with a JSON object containing restaurant_name, source_summary, cuisine_tags, parser_notes, and items. "
+                    "Estimate missing descriptions or nutrition only when necessary and mark uncertainty via confidence_score. "
+                    "Return JSON only, no additional text."
                 ),
             },
             {"role": "user", "content": user_text},
         ],
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "menu_analysis",
-                "strict": True,
-                "schema": MENU_ANALYSIS_SCHEMA,
-            }
-        },
+        temperature=0.3,
     )
-    parsed = json.loads(response.output_text)
+    parsed = json.loads(response.choices[0].message.content)
     parsed["source_url"] = url
     return parsed
 
 
 def generate_ai_recommendations(profile: dict[str, Any], menu_items: list[dict[str, Any]]) -> dict[str, Any]:
     client = get_openai_client()
-    request_payload: dict[str, Any] = {
-        "model": settings.openai_recommendation_model,
-        "input": [
+    
+    response = client.chat.completions.create(
+        model=settings.openai_recommendation_model,
+        messages=[
             {
                 "role": "system",
                 "content": (
@@ -263,7 +264,9 @@ def generate_ai_recommendations(profile: dict[str, Any], menu_items: list[dict[s
                     "Do not use web search, external databases, USDA data, or other internet sources. "
                     "Exclude allergy conflicts and strict diet conflicts. "
                     "Do not fabricate medical certainty. "
-                    "Always keep the disclaimer that this is not medical advice."
+                    "Always keep the disclaimer that this is not medical advice. "
+                    "Respond with a JSON object containing disclaimer, top_recommendations, alternatives, and dishes_to_avoid arrays. "
+                    "Return JSON only, no additional text."
                 ),
             },
             {
@@ -276,18 +279,10 @@ def generate_ai_recommendations(profile: dict[str, Any], menu_items: list[dict[s
                 ),
             },
         ],
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "recommendation_result",
-                "strict": True,
-                "schema": RECOMMENDATION_SCHEMA,
-            }
-        },
-    }
-
-    response = client.responses.create(**request_payload)
-    parsed = json.loads(response.output_text)
+        temperature=0.3,
+    )
+    
+    parsed = json.loads(response.choices[0].message.content)
     return parsed
 
 

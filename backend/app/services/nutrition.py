@@ -75,16 +75,17 @@ def enrich_menu_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return []
 
     client = get_openai_client()
-    response = client.responses.create(
+    response = client.chat.completions.create(
         model=settings.openai_menu_model,
-        input=[
+        messages=[
             {
                 "role": "system",
                 "content": (
                     "You are a restaurant menu analysis assistant. Use only the provided menu item text and fields. "
                     "Do not use external databases, web search, USDA data, or fixed nutrition tables. "
                     "Return conservative estimates and keep confidence lower when details are sparse. "
-                    "Do not claim medical certainty."
+                    "Do not claim medical certainty. "
+                    "Always respond with valid JSON only, no additional text."
                 ),
             },
             {
@@ -92,22 +93,16 @@ def enrich_menu_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "content": (
                     "Enrich each menu item in the same order it is provided. Return the same number of items, "
                     "preserving the original fields while adding inferred ingredients, nutrition estimates, allergens, "
-                    "diet compatibility, and a confidence score.\n\n"
+                    "diet compatibility, and a confidence score. "
+                    "Return your response as a JSON object with an 'items' array.\n\n"
                     f"Menu items JSON:\n{json.dumps(items, ensure_ascii=True)}"
                 ),
             },
         ],
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "menu_item_enrichment",
-                "strict": True,
-                "schema": NUTRITION_ENRICHMENT_SCHEMA,
-            }
-        },
+        temperature=0.3,
     )
 
-    parsed = json.loads(response.output_text)
+    parsed = json.loads(response.choices[0].message.content)
     enriched_items = parsed.get("items", [])
     if len(enriched_items) != len(items):
         raise RuntimeError("OpenAI returned a different number of enriched items than were provided.")

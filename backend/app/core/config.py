@@ -1,6 +1,7 @@
+import os
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,19 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     upload_dir: str = "storage/uploads"
     max_upload_size_mb: int = 10
+
+    @field_validator("openai_api_key", "openai_organization", "openai_project", mode="before")
+    @classmethod
+    def _normalize_optional_openai_values(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    def __init__(self, **data):
+        env_key = os.getenv("OPENAI_API_KEY")
+        if env_key and env_key.strip():
+            data["openai_api_key"] = env_key
+        super().__init__(**data)
 
     model_config = SettingsConfigDict(
         env_file=".env",
