@@ -176,8 +176,8 @@ async def upload_menu(
                     "menu_id": menu_id,
                     "processing_status": "completed",
                     "notes": (
-                        "File stored successfully, then parsed with local OCR/text extraction "
-                        "and rule-based nutrition estimation."
+                        "File stored successfully, then parsed with OCR/text extraction and "
+                        "OpenAI-powered nutrition estimation."
                     ),
                 },
                 update=True,

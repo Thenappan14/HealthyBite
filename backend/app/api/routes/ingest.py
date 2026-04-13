@@ -91,8 +91,8 @@ def ingest_url(
                 "source_url": str(payload.url),
                 "processing_status": "completed",
                 "notes": (
-                    "Fetched website text and parsed it locally into menu items with "
-                    "rule-based nutrition estimation."
+                    "Fetched website text and parsed it into menu items with OpenAI-powered "
+                    "nutrition estimation."
                 ),
             }
         )

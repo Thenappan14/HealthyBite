@@ -259,10 +259,10 @@ def generate_ai_recommendations(profile: dict[str, Any], menu_items: list[dict[s
                 "role": "system",
                 "content": (
                     "You are a nutrition guidance assistant for restaurant decisions, not a doctor. "
-                    "Use the user's profile and menu item data to rank dishes. "
+                    "Use only the user's profile and the supplied menu item data to rank dishes. "
+                    "Do not use web search, external databases, USDA data, or other internet sources. "
                     "Exclude allergy conflicts and strict diet conflicts. "
-                    "If needed, you may use web search to sanity-check likely nutrition or ingredient details, "
-                    "but do not fabricate medical certainty. "
+                    "Do not fabricate medical certainty. "
                     "Always keep the disclaimer that this is not medical advice."
                 ),
             },
@@ -285,9 +285,6 @@ def generate_ai_recommendations(profile: dict[str, Any], menu_items: list[dict[s
             }
         },
     }
-
-    if settings.openai_enable_web_search:
-        request_payload["tools"] = [{"type": "web_search_preview"}]
 
     response = client.responses.create(**request_payload)
     parsed = json.loads(response.output_text)
