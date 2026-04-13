@@ -42,7 +42,7 @@ Recommendations are based on estimated nutrition and provided profile informatio
 - Frontend: Next.js, TypeScript, Tailwind CSS, shadcn-style UI primitives
 - Backend: FastAPI, Pydantic, MongoDB, PyMongo
 - Ingestion: local PDF text extraction, OCR for images and scanned PDFs, and website-to-menu structuring
-- Recommendations: local profile-based ranking guided by estimated nutrition, menu content, and optional USDA live lookups
+- Recommendations: OpenAI-powered ranking and nutrition estimation based only on the uploaded or scraped menu content and the user profile
 
 ## Backend setup
 
@@ -60,7 +60,7 @@ API runs at `http://localhost:8000`, Swagger at `http://localhost:8000/docs`.
 
 The backend expects MongoDB to be available at the `MONGODB_URL` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example). The default is `mongodb://localhost:27017` with database name `platewise`.
 For image OCR and scanned PDFs, install Tesseract OCR locally. On Windows scanned-PDF conversion also needs Poppler for `pdf2image`.
-For more dynamic nutrition estimates, set `USDA_API_KEY` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example) to enable live USDA FoodData Central ingredient lookup.
+Set `OPENAI_API_KEY` in [backend/.env.example](/c:/Users/Projects/HealthyBite/backend/.env.example) to enable menu analysis and recommendations.
 
 ## Frontend setup
 
@@ -112,7 +112,7 @@ Required backend env values in [backend/.env](/c:/Users/Projects/HealthyBite/bac
 ```env
 MONGODB_URL=mongodb://localhost:27017
 MONGODB_DB_NAME=platewise
-USDA_API_KEY=your_usda_key_here
+OPENAI_API_KEY=your_openai_key_here
 ```
 
 Required frontend env value in [frontend/.env.local](/c:/Users/Projects/HealthyBite/frontend/.env.local):
@@ -125,9 +125,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 
 1. Sign up or log in.
 2. Complete the profile at `/profile`.
-3. Upload a menu at `/upload` or paste a restaurant URL at `/analyze-url`.
-4. Review ranked dishes at `/results`.
-5. Inspect recommendation history at `/saved`.
+3. **Quick analysis (new):** Upload menu at `/analyze` to get results with dietary filtering in one call.
+   - OR traditional flow: Upload at `/upload` or paste URL at `/analyze-url`, then view ranked dishes at `/results`.
+4. Inspect recommendation history at `/saved`.
 
 ## API summary
 
@@ -135,6 +135,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 - `POST /api/auth/login`
 - `GET /api/profile`
 - `PUT /api/profile`
+- **`POST /api/analyze` (NEW)** — Upload menu file and get dietary-filtered recommendations in one call
 - `POST /api/uploads`
 - `POST /api/ingest/url`
 - `GET /api/menus`
@@ -147,7 +148,7 @@ Detailed request and response notes are in [docs/api.md](/c:/Users/Projects/Heal
 
 ## Notes on estimation and safety
 
-- Nutrition values are estimated from menu wording, local extraction, and ingredient inference, with optional USDA FoodData Central lookup when configured.
+- Nutrition values, allergens, and dish ranking are generated from the provided menu content and profile data using OpenAI.
 - Allergens are inferred from menu information and should be treated as warnings, not guarantees.
 - The system avoids medical claims and uses cautious wording throughout the API and UI.
 - The system is a food guidance tool, not a clinician, and should not be used as medical advice.
