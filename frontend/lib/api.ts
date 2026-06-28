@@ -1,4 +1,4 @@
-import { AuthResponse, HistoryItem, MenuResponse, Profile, RecommendationResponse } from "@/lib/types";
+import { AnalyzeResponse, AuthResponse, HistoryItem, MenuResponse, Profile, RecommendationResponse } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
@@ -123,6 +123,25 @@ export async function uploadMenu(file: File): Promise<{ upload_id: number; menu_
   } catch {
     throw new Error("Upload failed");
   }
+}
+
+export async function analyzeMenu(file: File): Promise<AnalyzeResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/analyze`, {
+    method: "POST",
+    headers: {
+      ...(getStoredUserId() ? { "X-User-Id": getStoredUserId() as string } : {})
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error(`Analyze failed with status ${response.status}`);
+  }
+
+  return (await response.json()) as AnalyzeResponse;
 }
 
 export async function fetchRecommendations(menuId: number): Promise<RecommendationResponse> {

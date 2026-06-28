@@ -19,8 +19,8 @@
   --input: 36 32% 80%;
   --ring: 158 46% 34%;
   --danger: 350 74% 54%;
-  --font-sans: "Manrope";
-  --font-display: "Fraunces";
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  --font-display: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
 body {
@@ -38,4 +38,3 @@ a {
 * {
   @apply border-border;
 }
-

@@ -119,7 +119,7 @@ async def analyze_menu_with_restrictions(
                     {
                         "id": menu_item_id,
                         "menu_id": menu_id,
-                        "dish_name": item.get("name", "Unknown Dish"),
+                        "name": item.get("name", "Unknown Dish"),
                         "category": item.get("category"),
                         "description": item.get("description"),
                         "price": item.get("price"),
@@ -128,7 +128,7 @@ async def analyze_menu_with_restrictions(
                         "nutrition_estimate": item.get("nutrition_estimate", {}),
                         "allergens": item.get("allergens", []),
                         "inferred_ingredients": item.get("inferred_ingredients", []),
-                        "diet_compatibility": item.get("diet_compatibility", {}),
+                        "diet_compatibility": item.get("diet_compatibility", []),
                         "confidence_score": item.get("confidence_score", 0.0),
                     }
                 )

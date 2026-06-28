@@ -24,7 +24,22 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 
 
+@app.get("/", tags=["system"])
+def root() -> dict[str, str]:
+    return {
+        "name": "PlateWise API",
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "health": "/health",
+        "api_base": "/api",
+    }
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> None:
+    return None
+
+
 @app.get("/health", tags=["system"])
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
-
