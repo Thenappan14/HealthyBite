@@ -65,6 +65,13 @@ export type RecommendationResponse = {
   dishes_to_avoid: Recommendation[];
 };
 
+export type AnalyzeResponse = RecommendationResponse & {
+  upload_id: number;
+  menu_id: number;
+  upload_filename: string;
+  extracted_preview: string;
+};
+
 export type HistoryItem = {
   id: number;
   type: string;

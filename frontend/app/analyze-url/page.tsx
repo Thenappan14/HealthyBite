@@ -34,8 +34,12 @@ export default function AnalyzeUrlPage() {
                   const menu = await ingestRestaurantUrl(url);
                   setMessage(`Parsed ${menu.items.length} menu items from ${menu.source_url ?? url}.`);
                   router.push(`/results?menuId=${menu.id}`);
-                } catch {
-                  setMessage("Analysis failed. Please sign in and check that the backend is running.");
+                } catch (error) {
+                  setMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Analysis failed. Please sign in and check that the backend is running."
+                  );
                 }
               })
             }

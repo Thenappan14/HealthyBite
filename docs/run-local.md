@@ -21,7 +21,9 @@ Your [backend/.env](/c:/Users/Projects/HealthyBite/backend/.env) should include:
 ```env
 MONGODB_URL=mongodb://localhost:27017
 MONGODB_DB_NAME=platewise
-USDA_API_KEY=your_usda_key_here
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_MENU_MODEL=gpt-4.1-mini
+OPENAI_RECOMMENDATION_MODEL=gpt-4.1-mini
 ```
 
 Local OCR notes:
@@ -29,7 +31,12 @@ Local OCR notes:
 - Text PDFs work through `pypdf`
 - Images require Tesseract OCR installed locally
 - Scanned PDFs require both Tesseract OCR and Poppler on Windows because `pdf2image` converts PDF pages into images before OCR
-- USDA FoodData Central is optional, but if you add `USDA_API_KEY` the backend will use live ingredient nutrition lookups before falling back to local estimates
+- OpenAI is required for AI menu analysis and recommendations. You can verify the key with:
+
+```powershell
+cd c:\Users\Projects\HealthyBite\backend
+python scripts\openai_smoke_test.py
+```
 
 ## Frontend
 

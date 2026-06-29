@@ -3,10 +3,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from gridfs import GridFS
+from openai import AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.db.mongo import next_sequence, with_timestamps
 from app.db.session import get_db
 from app.schemas.menu import UploadRecordRead
@@ -51,11 +51,8 @@ async def analyze_menu_with_restrictions(
 
     # Step 1: Store upload record
     upload_id = next_sequence(db, "upload_records")
-    Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
-    file_path = Path(settings.upload_dir) / f"{upload_id}-{file.filename or 'menu-upload'}"
     contents = await file.read()
-    file_path.write_bytes(contents)
-    
+
     gridfs_id = GridFS(db).put(
         contents,
         filename=file.filename or f"upload-{upload_id}",
@@ -72,7 +69,7 @@ async def analyze_menu_with_restrictions(
                 "file_type": suffix.replace(".", ""),
                 "source_url": None,
                 "processing_status": "processing",
-                "file_path": str(file_path),
+                "file_path": None,
                 "file_storage": {
                     "gridfs_id": str(gridfs_id),
                     "content_type": file.content_type or "application/octet-stream",
@@ -119,7 +116,7 @@ async def analyze_menu_with_restrictions(
                     {
                         "id": menu_item_id,
                         "menu_id": menu_id,
-                        "dish_name": item.get("name", "Unknown Dish"),
+                        "name": item.get("name", "Unknown Dish"),
                         "category": item.get("category"),
                         "description": item.get("description"),
                         "price": item.get("price"),
@@ -128,7 +125,7 @@ async def analyze_menu_with_restrictions(
                         "nutrition_estimate": item.get("nutrition_estimate", {}),
                         "allergens": item.get("allergens", []),
                         "inferred_ingredients": item.get("inferred_ingredients", []),
-                        "diet_compatibility": item.get("diet_compatibility", {}),
+                        "diet_compatibility": item.get("diet_compatibility", []),
                         "confidence_score": item.get("confidence_score", 0.0),
                     }
                 )
@@ -211,6 +208,42 @@ async def analyze_menu_with_restrictions(
             ],
         )
 
+    except RateLimitError as exc:
+        logger.warning("OpenAI quota/ratelimit error during combined analyze: %s", exc)
+        db.upload_records.update_one(
+            {"id": upload_id},
+            {
+                "$set": with_timestamps(
+                    {
+                        "processing_status": "failed",
+                        "notes": "OpenAI quota or rate limit exceeded. Check billing/usage limits and try again.",
+                    },
+                    update=True,
+                )
+            },
+        )
+        raise HTTPException(
+            status_code=429,
+            detail="OpenAI returned insufficient_quota or a rate limit for the API key currently loaded by the backend.",
+        ) from exc
+    except AuthenticationError as exc:
+        logger.warning("OpenAI authentication error during combined analyze: %s", exc)
+        db.upload_records.update_one(
+            {"id": upload_id},
+            {
+                "$set": with_timestamps(
+                    {
+                        "processing_status": "failed",
+                        "notes": "OpenAI API key was rejected. Check backend/.env and restart the backend.",
+                    },
+                    update=True,
+                )
+            },
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="OpenAI API key was rejected. Check backend/.env, revoke exposed keys, create a new key, and restart the backend.",
+        ) from exc
     except Exception as exc:
         logger.exception("Combined analysis failed for upload: %s", file.filename)
         db.upload_records.update_one(

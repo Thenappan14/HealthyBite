@@ -1,15 +1,19 @@
-import os
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 
-from dotenv import load_dotenv
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_DIR))
+
 from openai import APIStatusError, OpenAI
+
+from app.core.config import settings
 
 
 def main() -> None:
-    load_dotenv()
-    api_key = os.environ.get("OPENAI_API_KEY")
-    organization = os.environ.get("OPENAI_ORGANIZATION")
-    project = os.environ.get("OPENAI_PROJECT")
+    api_key = settings.openai_api_key
+    organization = settings.openai_organization
+    project = settings.openai_project
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in backend/.env")
 
@@ -19,14 +23,15 @@ def main() -> None:
         project=project,
     )
     endpoint = "/v1/responses"
-    model = "gpt-4o-mini"
+    model = settings.openai_recommendation_model
     timestamp_utc = datetime.now(timezone.utc).isoformat()
 
     print("UTC timestamp:", timestamp_utc)
     print("Endpoint:", endpoint)
     print("Model:", model)
-    print("Organization:", organization)
-    print("Project:", project)
+    print("API key loaded:", bool(api_key))
+    print("Organization set:", bool(organization))
+    print("Project set:", bool(project))
 
     try:
         response = client.responses.create(
