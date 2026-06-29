@@ -9,10 +9,6 @@ router = APIRouter()
 
 @router.get("/openai-test")
 def openai_test() -> dict:
-    masked_key = None
-    if settings.openai_api_key:
-        masked_key = f"...{settings.openai_api_key[-6:]}"
-
     try:
         client = get_openai_client()
         response = client.responses.create(
@@ -22,22 +18,31 @@ def openai_test() -> dict:
         return {
             "ok": True,
             "model": settings.openai_menu_model,
-            "key_suffix": masked_key,
+            "recommendation_model": settings.openai_recommendation_model,
+            "api_key_loaded": bool(settings.openai_api_key),
+            "organization_set": bool(settings.openai_organization),
+            "project_set": bool(settings.openai_project),
             "output": response.output_text,
         }
     except RateLimitError:
         return {
             "ok": False,
             "model": settings.openai_menu_model,
-            "key_suffix": masked_key,
+            "recommendation_model": settings.openai_recommendation_model,
+            "api_key_loaded": bool(settings.openai_api_key),
+            "organization_set": bool(settings.openai_organization),
+            "project_set": bool(settings.openai_project),
             "error_type": "rate_limit",
-            "detail": "OpenAI quota exceeded for the key currently loaded by the backend.",
+            "detail": "OpenAI returned insufficient_quota or a rate limit for the key currently loaded by the backend.",
         }
     except AuthenticationError:
         return {
             "ok": False,
             "model": settings.openai_menu_model,
-            "key_suffix": masked_key,
+            "recommendation_model": settings.openai_recommendation_model,
+            "api_key_loaded": bool(settings.openai_api_key),
+            "organization_set": bool(settings.openai_organization),
+            "project_set": bool(settings.openai_project),
             "error_type": "auth",
             "detail": "OpenAI authentication failed for the key currently loaded by the backend.",
         }
@@ -45,7 +50,10 @@ def openai_test() -> dict:
         return {
             "ok": False,
             "model": settings.openai_menu_model,
-            "key_suffix": masked_key,
+            "recommendation_model": settings.openai_recommendation_model,
+            "api_key_loaded": bool(settings.openai_api_key),
+            "organization_set": bool(settings.openai_organization),
+            "project_set": bool(settings.openai_project),
             "error_type": "connection",
             "detail": "The backend could not connect to OpenAI.",
         }
@@ -53,16 +61,21 @@ def openai_test() -> dict:
         return {
             "ok": False,
             "model": settings.openai_menu_model,
-            "key_suffix": masked_key,
+            "recommendation_model": settings.openai_recommendation_model,
+            "api_key_loaded": bool(settings.openai_api_key),
+            "organization_set": bool(settings.openai_organization),
+            "project_set": bool(settings.openai_project),
             "error_type": "api_status",
-            "detail": f"OpenAI API returned status {exc.status_code}.",
+            "detail": f"OpenAI API returned status {exc.status_code}. Request id: {exc.request_id}",
         }
     except RuntimeError as exc:
         return {
             "ok": False,
             "model": settings.openai_menu_model,
-            "key_suffix": masked_key,
+            "recommendation_model": settings.openai_recommendation_model,
+            "api_key_loaded": bool(settings.openai_api_key),
+            "organization_set": bool(settings.openai_organization),
+            "project_set": bool(settings.openai_project),
             "error_type": "runtime",
             "detail": str(exc),
         }
-

@@ -1,8 +1,34 @@
-import os
+from pathlib import Path
 from functools import lru_cache
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+ENV_FILE = BACKEND_DIR / ".env"
+
+
+def _read_file_openai_values() -> dict[str, str]:
+    field_names = {
+        "OPENAI_API_KEY": "openai_api_key",
+        "OPENAI_ORGANIZATION": "openai_organization",
+        "OPENAI_PROJECT": "openai_project",
+        "OPENAI_MENU_MODEL": "openai_menu_model",
+        "OPENAI_RECOMMENDATION_MODEL": "openai_recommendation_model",
+    }
+    if not ENV_FILE.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        if not line or line.lstrip().startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        field_name = field_names.get(key.strip())
+        if field_name:
+            values[field_name] = value.strip().strip('"').strip("'")
+    return values
 
 
 class Settings(BaseSettings):
@@ -29,18 +55,22 @@ class Settings(BaseSettings):
     def _normalize_optional_openai_values(cls, value: str | None) -> str | None:
         if isinstance(value, str) and not value.strip():
             return None
+        if isinstance(value, str) and value.startswith("OPENAI_API_KEY="):
+            return value.removeprefix("OPENAI_API_KEY=").strip()
         return value
 
     def __init__(self, **data):
-        env_key = os.getenv("OPENAI_API_KEY")
-        if env_key and env_key.strip():
-            data["openai_api_key"] = env_key
+        file_openai_values = _read_file_openai_values()
+        for field_name, value in file_openai_values.items():
+            if field_name not in data and value and value.strip():
+                data[field_name] = value
         super().__init__(**data)
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
 

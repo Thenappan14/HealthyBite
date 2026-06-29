@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from openai import APIStatusError, AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
@@ -32,10 +33,29 @@ def recommend_for_menu(
     if not menu_items:
         raise HTTPException(status_code=400, detail="No menu items were extracted for this menu.")
 
-    result = generate_recommendations(
-        build_profile_model(current_user["profile"]),
-        build_menu_item_models(menu_items),
-    )
+    try:
+        result = generate_recommendations(
+            build_profile_model(current_user["profile"]),
+            build_menu_item_models(menu_items),
+        )
+    except RateLimitError as exc:
+        logger.warning("OpenAI quota/ratelimit error during recommendation generation: %s", exc)
+        raise HTTPException(
+            status_code=429,
+            detail="OpenAI returned insufficient_quota or a rate limit for the API key currently loaded by the backend.",
+        ) from exc
+    except AuthenticationError as exc:
+        logger.warning("OpenAI authentication error during recommendation generation: %s", exc)
+        raise HTTPException(
+            status_code=401,
+            detail="OpenAI API key was rejected. Check backend/.env, revoke exposed keys, create a new key, and restart the backend.",
+        ) from exc
+    except APIStatusError as exc:
+        logger.warning("OpenAI API error during recommendation generation: %s", exc)
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenAI API returned status {exc.status_code}. Request id: {exc.request_id}",
+        ) from exc
 
     for bucket_name, rec_type in (
         ("top_recommendations", "top_pick"),

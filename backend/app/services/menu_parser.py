@@ -25,6 +25,7 @@ CATEGORY_HINTS = {
     "meat",
     "ice cream"
 }
+MAX_PARSED_MENU_ITEMS = 80
 
 
 def normalize_menu_text(text: str) -> dict[str, Any]:
@@ -44,12 +45,12 @@ def normalize_menu_document(document: dict[str, Any]) -> dict[str, Any]:
 
     for idx, line in enumerate(cleaned_lines):
         normalized = re.sub(r"\s+", " ", line)
-        if _is_category_line(normalized):
-            current_category = normalized.title()
-            continue
-
         price_match = PRICE_PATTERN.search(normalized)
         next_line = cleaned_lines[idx + 1] if idx + 1 < len(cleaned_lines) else ""
+
+        if not price_match and _is_category_line(normalized):
+            current_category = normalized.title()
+            continue
 
         if price_match or _looks_like_menu_item(normalized):
             item_line = normalized
@@ -75,6 +76,8 @@ def normalize_menu_document(document: dict[str, Any]) -> dict[str, Any]:
         parser_notes.append("Structured parsing was limited, so the menu text may need a cleaner upload.")
         items.extend(_fallback_chunk_items(cleaned_lines))
 
+    items = _dedupe_and_limit_items(items)
+
     if not parser_notes:
         parser_notes.append("Menu text was normalized with local rule-based parsing.")
 
@@ -93,12 +96,12 @@ def _normalize_menu_pages(pages: list[dict[str, Any]]) -> dict[str, Any]:
 
         for idx, line in enumerate(page_lines):
             normalized = re.sub(r"\s+", " ", line)
-            if _is_category_line(normalized):
-                current_category = normalized
-                continue
-
             price_match = PRICE_PATTERN.search(normalized)
             next_line = page_lines[idx + 1] if idx + 1 < len(page_lines) else ""
+
+            if not price_match and _is_category_line(normalized):
+                current_category = normalized
+                continue
 
             if price_match or _looks_like_menu_item(normalized):
                 item_line = normalized
@@ -130,6 +133,8 @@ def _normalize_menu_pages(pages: list[dict[str, Any]]) -> dict[str, Any]:
             parser_notes.append("Structured parsing was limited, so the menu text may need a cleaner upload.")
             items.extend(_fallback_chunk_items(all_lines))
 
+    items = _dedupe_and_limit_items(items)
+
     if not parser_notes:
         parser_notes.append("Menu text was normalized with local rule-based parsing and page tracking.")
 
@@ -138,12 +143,18 @@ def _normalize_menu_pages(pages: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _is_category_line(line: str) -> bool:
     lowered = line.lower().strip(":")
+    if _is_noise_line(line):
+        return False
     return lowered in CATEGORY_HINTS or (line.isupper() and len(line.split()) <= 4)
 
 
 def _looks_like_menu_item(line: str) -> bool:
     tokens = line.split()
     if len(tokens) < 2:
+        return False
+    if len(tokens) > 14:
+        return False
+    if _is_noise_line(line):
         return False
     return any(char.isalpha() for char in line) and len(line) <= 120
 
@@ -166,6 +177,8 @@ def _fallback_chunk_items(lines: list[str]) -> list[dict[str, Any]]:
     for chunk in lines[:10]:
         if len(chunk.split()) < 2:
             continue
+        if _is_noise_line(chunk):
+            continue
         items.append(
             {
                 "category": None,
@@ -177,3 +190,40 @@ def _fallback_chunk_items(lines: list[str]) -> list[dict[str, Any]]:
             }
         )
     return items
+
+
+def _is_noise_line(line: str) -> bool:
+    lowered = line.lower()
+    return any(
+        phrase in lowered
+        for phrase in (
+            "terms and conditions",
+            "prices are subject",
+            "service charge",
+            "valid from",
+            "follow us",
+            "all prices",
+            "subject to",
+            "facebook",
+            "instagram",
+            "copyright",
+            "swensen's menu",
+        )
+    )
+
+
+def _dedupe_and_limit_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        key = re.sub(r"\s+", " ", name.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+        if len(deduped) >= MAX_PARSED_MENU_ITEMS:
+            break
+    return deduped

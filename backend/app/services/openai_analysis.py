@@ -90,6 +90,9 @@ RECOMMENDATION_SCHEMA = {
                     "menu_item_id": {"type": "integer"},
                     "dish_name": {"type": "string"},
                     "category": {"type": ["string", "null"]},
+                    "price": {"type": ["number", "null"]},
+                    "source_page": {"type": ["integer", "null"]},
+                    "source_text": {"type": ["string", "null"]},
                     "match_score": {"type": "number"},
                     "summary_reason": {"type": "string"},
                     "nutrition_estimate": {
@@ -124,6 +127,9 @@ RECOMMENDATION_SCHEMA = {
                     "menu_item_id",
                     "dish_name",
                     "category",
+                    "price",
+                    "source_page",
+                    "source_text",
                     "match_score",
                     "summary_reason",
                     "nutrition_estimate",
@@ -157,17 +163,17 @@ def get_openai_client() -> OpenAI:
 
 def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:
     client = get_openai_client()
-    prompt = (
+    instructions = (
         "You are a restaurant menu analysis assistant. Extract the menu into structured JSON. "
         "Infer likely ingredients and estimate nutrition conservatively from the menu information. "
         "Do not claim medical certainty. Use words like estimated, likely, and based on menu information."
     )
 
     suffix = filename.lower()
-    user_content: list[dict[str, Any]] = []
+    user_content: list[dict[str, Any]]
     if suffix.endswith(".pdf"):
         extracted_text = _extract_pdf_text(content)
-        user_content.append(
+        user_content = [
             {
                 "type": "input_text",
                 "text": (
@@ -177,16 +183,16 @@ def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:
                     f"{extracted_text[:18000]}"
                 ),
             }
-        )
+        ]
     else:
         mime_type = _detect_image_mime_type(suffix)
         file_data = base64.b64encode(content).decode("utf-8")
-        user_content.append(
+        user_content = [
             {
                 "type": "input_image",
                 "image_url": f"data:{mime_type};base64,{file_data}",
             }
-        )
+        ]
 
     user_content.append(
         {
@@ -198,26 +204,20 @@ def analyze_uploaded_menu(filename: str, content: bytes) -> dict[str, Any]:
         }
     )
 
-    text_input = (
-        prompt + "\n\n"
-        + "Respond with a valid JSON object containing restaurant_name, source_summary, cuisine_tags, parser_notes, and items array. "
-        + "Each item should have category, name, description, price, inferred_ingredients, nutrition_estimate, allergens, diet_compatibility, and confidence_score. "
-        + "Return JSON only, no additional text.\n\n"
-        + "Content to analyze:"
-    )
-    for content_block in user_content:
-        if content_block.get("type") == "input_text":
-            text_input += f"\n{content_block['text']}"
-    
-    response = client.chat.completions.create(
+    response = client.responses.create(
         model=settings.openai_menu_model,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text_input},
+        instructions=instructions,
+        input=[
+            {
+                "role": "user",
+                "content": user_content,
+            }
         ],
         temperature=0.3,
+        timeout=60,
+        text=_json_schema_format("menu_analysis", MENU_ANALYSIS_SCHEMA),
     )
-    return json.loads(response.choices[0].message.content)
+    return _parse_json_response(response)
 
 
 def analyze_restaurant_url(url: str, website_text: str) -> dict[str, Any]:
@@ -229,60 +229,73 @@ def analyze_restaurant_url(url: str, website_text: str) -> dict[str, Any]:
         f"{website_text[:12000]}"
     )
 
-    response = client.chat.completions.create(
+    response = client.responses.create(
         model=settings.openai_menu_model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a restaurant menu extraction assistant. Convert website content into structured menu data. "
-                    "Respond with a JSON object containing restaurant_name, source_summary, cuisine_tags, parser_notes, and items. "
-                    "Estimate missing descriptions or nutrition only when necessary and mark uncertainty via confidence_score. "
-                    "Return JSON only, no additional text."
-                ),
-            },
-            {"role": "user", "content": user_text},
-        ],
+        instructions=(
+            "You are a restaurant menu extraction assistant. Convert website content into structured menu data. "
+            "Estimate missing descriptions or nutrition only when necessary and mark uncertainty via confidence_score."
+        ),
+        input=user_text,
         temperature=0.3,
+        timeout=60,
+        text=_json_schema_format("menu_analysis", MENU_ANALYSIS_SCHEMA),
     )
-    parsed = json.loads(response.choices[0].message.content)
+    parsed = _parse_json_response(response)
     parsed["source_url"] = url
     return parsed
 
 
 def generate_ai_recommendations(profile: dict[str, Any], menu_items: list[dict[str, Any]]) -> dict[str, Any]:
     client = get_openai_client()
-    
-    response = client.chat.completions.create(
+
+    response = client.responses.create(
         model=settings.openai_recommendation_model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a nutrition guidance assistant for restaurant decisions, not a doctor. "
-                    "Use only the user's profile and the supplied menu item data to rank dishes. "
-                    "Do not use web search, external databases, USDA data, or other internet sources. "
-                    "Exclude allergy conflicts and strict diet conflicts. "
-                    "Do not fabricate medical certainty. "
-                    "Always keep the disclaimer that this is not medical advice. "
-                    "Respond with a JSON object containing disclaimer, top_recommendations, alternatives, and dishes_to_avoid arrays. "
-                    "Return JSON only, no additional text."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "User profile JSON:\n"
-                    f"{json.dumps(profile, ensure_ascii=True)}\n\n"
-                    "Menu items JSON:\n"
-                    f"{json.dumps(menu_items, ensure_ascii=True)}"
-                ),
-            },
-        ],
+        instructions=(
+            "You are a nutrition guidance assistant for restaurant decisions, not a doctor. "
+            "Use only the user's profile and the supplied menu item data to rank dishes. "
+            "Analyze every menu item. Exclude allergy conflicts and strict diet conflicts from top recommendations. "
+            "Respect dietary restrictions, disliked foods, preferred cuisines, health goals, calorie targets, and nutrition goals when present. "
+            "Do not use web search, external databases, USDA data, or other internet sources. "
+            "Do not fabricate medical certainty. Always keep the disclaimer that this is not medical advice. "
+            "Rank recommendations from best to worst with match_score from 0 to 100."
+        ),
+        input=(
+            "User profile JSON:\n"
+            f"{json.dumps(profile, ensure_ascii=True)}\n\n"
+            "Menu items JSON:\n"
+            f"{json.dumps(menu_items, ensure_ascii=True)}"
+        ),
         temperature=0.3,
+        timeout=75,
+        text=_json_schema_format("recommendations", RECOMMENDATION_SCHEMA),
     )
-    
-    parsed = json.loads(response.choices[0].message.content)
+
+    return _parse_json_response(response)
+
+
+def _json_schema_format(name: str, schema: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": name,
+            "schema": schema,
+            "strict": True,
+        }
+    }
+
+
+def _parse_json_response(response: Any) -> dict[str, Any]:
+    output_text = getattr(response, "output_text", None)
+    if not output_text:
+        raise RuntimeError("OpenAI returned no text output.")
+
+    try:
+        parsed = json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("OpenAI returned invalid JSON.") from exc
+
+    if not isinstance(parsed, dict):
+        raise RuntimeError("OpenAI returned JSON, but not an object.")
     return parsed
 
 

@@ -1,6 +1,7 @@
 import { AnalyzeResponse, AuthResponse, HistoryItem, MenuResponse, Profile, RecommendationResponse } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+const DEFAULT_TIMEOUT_MS = 180000;
 
 function getStoredUserId(): string | null {
   if (typeof window === "undefined") {
@@ -8,6 +9,23 @@ function getStoredUserId(): string | null {
   }
 
   return window.localStorage.getItem("platewise_user_id");
+}
+
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json();
+    const detail = payload?.detail;
+    if (typeof detail === "string") {
+      return detail;
+    }
+    if (detail?.message && typeof detail.message === "string") {
+      return detail.message;
+    }
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
 }
 
 export function persistAuthSession(auth: AuthResponse) {
@@ -21,9 +39,12 @@ export function persistAuthSession(auth: AuthResponse) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const userId = getStoredUserId();
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
+      signal: init?.signal ?? controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...(userId ? { "X-User-Id": userId } : {}),
@@ -33,12 +54,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      throw new Error(await readApiError(response, `Request failed with status ${response.status}`));
     }
 
     return (await response.json()) as T;
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The request took too long. Try a clearer or shorter menu file.");
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error("API unavailable");
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -101,10 +130,13 @@ export async function fetchMenu(menuId: number): Promise<MenuResponse | null> {
 export async function uploadMenu(file: File): Promise<{ upload_id: number; menu_id: number; extracted_preview: string }> {
   const formData = new FormData();
   formData.append("file", file);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
   try {
     const response = await fetch(`${API_BASE_URL}/uploads`, {
       method: "POST",
+      signal: controller.signal,
       headers: {
         ...(getStoredUserId() ? { "X-User-Id": getStoredUserId() as string } : {})
       },
@@ -112,7 +144,7 @@ export async function uploadMenu(file: File): Promise<{ upload_id: number; menu_
     });
 
     if (!response.ok) {
-      throw new Error(`Upload failed with status ${response.status}`);
+      throw new Error(await readApiError(response, `Upload failed with status ${response.status}`));
     }
 
     return (await response.json()) as {
@@ -120,28 +152,51 @@ export async function uploadMenu(file: File): Promise<{ upload_id: number; menu_
       menu_id: number;
       extracted_preview: string;
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The upload took too long. Try a clearer or shorter menu file.");
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error("Upload failed");
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
 export async function analyzeMenu(file: File): Promise<AnalyzeResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-  const response = await fetch(`${API_BASE_URL}/analyze`, {
-    method: "POST",
-    headers: {
-      ...(getStoredUserId() ? { "X-User-Id": getStoredUserId() as string } : {})
-    },
-    body: formData
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        ...(getStoredUserId() ? { "X-User-Id": getStoredUserId() as string } : {})
+      },
+      body: formData
+    });
 
-  if (!response.ok) {
-    throw new Error(`Analyze failed with status ${response.status}`);
+    if (!response.ok) {
+      throw new Error(await readApiError(response, `Analyze failed with status ${response.status}`));
+    }
+
+    return (await response.json()) as AnalyzeResponse;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Analysis took too long. Try a clearer or shorter menu file.");
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Analyze failed");
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-
-  return (await response.json()) as AnalyzeResponse;
 }
 
 export async function fetchRecommendations(menuId: number): Promise<RecommendationResponse> {

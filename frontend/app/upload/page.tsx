@@ -9,7 +9,7 @@ import { LoadingState } from "@/components/app/loading-state";
 import { UploadDropzone } from "@/components/app/upload-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { uploadMenu } from "@/lib/api";
+import { analyzeMenu } from "@/lib/api";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -44,13 +44,21 @@ export default function UploadPage() {
                   onFileSelected={(file) =>
                     startTransition(async () => {
                       try {
-                        const result = await uploadMenu(file);
+                        const result = await analyzeMenu(file);
+                        window.sessionStorage.setItem(
+                          `platewise_analyze_${result.menu_id}`,
+                          JSON.stringify(result)
+                        );
                         setMessage(
-                          `Upload complete. Menu ${result.menu_id} is ready for recommendation generation.`
+                          `Analysis complete. Menu ${result.menu_id} is ready.`
                         );
                         router.push(`/results?menuId=${result.menu_id}`);
-                      } catch {
-                        setMessage("Upload failed. Please sign in and make sure the backend is running.");
+                      } catch (error) {
+                        setMessage(
+                          error instanceof Error
+                            ? error.message
+                            : "Upload failed. Please sign in and make sure the backend is running."
+                        );
                       }
                     })
                   }

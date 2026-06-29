@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi import HTTPException
+from openai import AuthenticationError, RateLimitError
 from pymongo.database import Database
 
 from app.api.deps import get_current_user
@@ -29,7 +30,20 @@ def ingest_url(
         raise HTTPException(status_code=502, detail="Could not fetch the restaurant URL.") from exc
 
     normalized = normalize_menu_text(result.get("raw_text", ""))
-    analyzed_items = enrich_menu_items(normalized.get("items", []))
+    try:
+        analyzed_items = enrich_menu_items(normalized.get("items", []))
+    except RateLimitError as exc:
+        logger.warning("OpenAI quota/ratelimit error during URL menu enrichment: %s", exc)
+        raise HTTPException(
+            status_code=429,
+            detail="OpenAI returned insufficient_quota or a rate limit for the API key currently loaded by the backend.",
+        ) from exc
+    except AuthenticationError as exc:
+        logger.warning("OpenAI authentication error during URL menu enrichment: %s", exc)
+        raise HTTPException(
+            status_code=401,
+            detail="OpenAI API key was rejected. Check backend/.env, revoke exposed keys, create a new key, and restart the backend.",
+        ) from exc
     result["items"] = analyzed_items
     result["parser_notes"] = result.get("parser_notes", []) + normalized.get("parser_notes", [])
 

@@ -46,8 +46,12 @@ export function ResultsClient() {
 
         setMenu(nextMenu);
         setResults(nextResults ?? fetchedResults);
-      } catch {
-        setError("Unable to load recommendations right now.");
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load recommendations right now."
+        );
       } finally {
         setLoaded(true);
       }
@@ -121,4 +125,3 @@ export function ResultsClient() {
     </main>
   );
 }
-
